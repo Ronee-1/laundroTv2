@@ -2,7 +2,7 @@
 
 ## Current Status
 - Current Phase: Phase 3 — Dashboard Audit & Manajemen Kuota (REVISION IN PROGRESS).
-- Progress: 70% (Scope revised per dosen feedback — FR-OWN-02 & FR-FIN-08 pending implementation).
+- Progress: 85% (Backend revisions complete — FR-OWN-02 & FR-FIN-08 implemented. Frontend updates pending).
 
 ## Completed Tasks
 - [x] AGENTS.md implementation with strict business rules.
@@ -29,6 +29,14 @@
 - [x] Update TugasHarian.tsx with offline detection, queue management, and auto-sync.
 - [x] Final verification: typecheck and build passed 100%.
 
+### Dosen Revision (Backend)
+- [x] Update expense.ts with new fields: tanggal, kategori kustom (Gaji/Sewa/Listrik/Logistik/Dana Darurat/Lainnya), bukti_nota_url (FR-FIN-08).
+- [x] Update POST /api/expenses/request to accept comprehensive expense schema with date validation (FR-FIN-08).
+- [x] Add health_status (Healthy/Warning/Critical) to owner dashboard based on budget utilization (FR-OWN-02).
+- [x] Add category_breakdown per branch showing expense distribution by category (FR-OWN-02).
+- [x] Add category spike alerts when any category exceeds 40% of total branch expenses (FR-OWN-02).
+- [x] Add branches_needing_attention count to dashboard summary (FR-OWN-02).
+
 ## Project Summary
 **Laundro Truck v2.0** — Multi-branch laundry management system with Hub-and-Spoke architecture.
 
@@ -41,6 +49,8 @@
 6. **Expense Approval Workflow**: Hub admin approval/rejection with real-time budget deduction.
 7. **Executive Dashboard**: Consolidated financial analytics per branch with profitability metrics.
 8. **Courier Offline Queue**: LocalStorage-based offline resilience with timestamp preservation and auto-sync.
+9. **Comprehensive Expense Tracker**: Daily operational expense form with custom categories and receipt upload (FR-FIN-08).
+10. **Multi-Branch Analytics**: KPI matrix with health status and category spike detection (FR-OWN-02).
 
 ### Architecture
 - **Monorepo**: npm workspaces (hub, spokes/*, packages/*)
@@ -61,7 +71,9 @@
 - [ ] Real-time WebSocket notifications for admin dashboard
 
 ## Pending Revisions (Dosen Feedback)
-- [ ] Implement FR-OWN-02: Multi-Branch Analytics Dashboard with KPI data points per branch.
-- [ ] Implement FR-FIN-08: Comprehensive Expense Tracker form (tanggal, nominal, kategori kustom, cabang asal, bukti nota).
-- [ ] Add visual alert/warning system on central dashboard.
+- [x] Implement FR-OWN-02: Multi-Branch Analytics Dashboard with KPI data points per branch (BACKEND COMPLETE).
+- [x] Implement FR-FIN-08: Comprehensive Expense Tracker form (tanggal, nominal, kategori kustom, cabang asal, bukti nota) (BACKEND COMPLETE).
+- [ ] Update frontend DashboardEksekutif to display health_status, category_breakdown, and alerts (FR-OWN-02).
+- [ ] Create frontend ExpenseForm component with new schema (FR-FIN-08).
+- [ ] Add visual alert/warning system on central dashboard (FRONTEND).
 - [ ] Build two-directional Cash Flow report module.

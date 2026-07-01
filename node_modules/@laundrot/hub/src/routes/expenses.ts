@@ -1,16 +1,20 @@
 import { Router, type Request, type Response } from 'express';
 import { checkOverbudget, deductBudget } from '../services/budget.js';
-import { createExpense, getExpenseById, updateExpenseStatus, type Expense } from '../services/expense.js';
+import { createExpense, getExpenseById, updateExpenseStatus, type ExpenseCategory } from '../services/expense.js';
 import { getBranchById } from '../config/branches.js';
 import { createJournalEntry } from '../services/cashbook.js';
 
 const router = Router();
 
+const VALID_CATEGORIES: ExpenseCategory[] = ['Gaji', 'Sewa', 'Listrik', 'Logistik', 'Dana Darurat', 'Lainnya'];
+
 interface ExpenseRequestBody {
   id_cabang: string;
+  tanggal: string;
   nominal: number;
   deskripsi: string;
-  kategori: 'Operasional' | 'Dana Darurat' | 'Stok' | 'Mutasi';
+  kategori: ExpenseCategory;
+  bukti_nota_url: string;
 }
 
 interface ExpenseSuccessResponse {
@@ -19,6 +23,8 @@ interface ExpenseSuccessResponse {
   id_cabang: string;
   status: string;
   nominal: number;
+  kategori: string;
+  tanggal: string;
   sisa_pagu: number;
   message: string;
 }
@@ -45,12 +51,20 @@ type ExpenseResponse = ExpenseSuccessResponse | OverbudgetErrorResponse | Valida
 router.post(
   '/request',
   (req: Request<{}, ExpenseResponse, ExpenseRequestBody>, res: Response<ExpenseResponse>) => {
-    const { id_cabang, nominal, deskripsi, kategori } = req.body;
+    const { id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url } = req.body;
 
-    if (!id_cabang || !nominal || !deskripsi || !kategori) {
+    if (!id_cabang || !tanggal || !nominal || !deskripsi || !kategori || !bukti_nota_url) {
       res.status(400).json({
         success: false,
-        error: 'Field wajib: id_cabang, nominal, deskripsi, kategori.',
+        error: 'Field wajib: id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url.',
+      });
+      return;
+    }
+
+    if (!VALID_CATEGORIES.includes(kategori)) {
+      res.status(400).json({
+        success: false,
+        error: `Kategori tidak valid. Kategori yang diizinkan: ${VALID_CATEGORIES.join(', ')}`,
       });
       return;
     }
@@ -72,6 +86,15 @@ router.post(
       return;
     }
 
+    const parsedDate = new Date(tanggal);
+    if (isNaN(parsedDate.getTime())) {
+      res.status(400).json({
+        success: false,
+        error: 'Format tanggal tidak valid. Gunakan format ISO 8601.',
+      });
+      return;
+    }
+
     const budgetCheck = checkOverbudget(id_cabang, nominal);
 
     if (budgetCheck.overbudget) {
@@ -89,7 +112,14 @@ router.post(
       return;
     }
 
-    const expense = createExpense({ id_cabang, nominal, deskripsi, kategori });
+    const expense = createExpense({
+      id_cabang,
+      tanggal: parsedDate,
+      nominal,
+      deskripsi,
+      kategori,
+      bukti_nota_url,
+    });
 
     res.status(201).json({
       success: true,
@@ -97,8 +127,10 @@ router.post(
       id_cabang: expense.id_cabang,
       status: expense.status,
       nominal: expense.nominal,
+      kategori: expense.kategori,
+      tanggal: expense.tanggal.toISOString(),
       sisa_pagu: budgetCheck.sisa_pagu,
-      message: `Pengajuan pengeluaran Rp${nominal.toLocaleString('id-ID')} dari ${branch.nama_cabang} berhasil dicatat. Menunggu persetujuan Admin Pusat.`,
+      message: `Pengajuan pengeluaran Rp${nominal.toLocaleString('id-ID')} (${kategori}) dari ${branch.nama_cabang} berhasil dicatat. Menunggu persetujuan Admin Pusat.`,
     });
   },
 );
@@ -204,7 +236,7 @@ router.patch(
           tipe: journal.tipe,
           deskripsi: journal.deskripsi,
         },
-        message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} dari ${branch?.nama_cabang ?? expense.id_cabang} disetujui. Pagu cabang telah dikurangi dan jurnal tercatat di Buku Kas Pusat.`,
+        message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} (${expense.kategori}) dari ${branch?.nama_cabang ?? expense.id_cabang} disetujui. Pagu cabang telah dikurangi dan jurnal tercatat di Buku Kas Pusat.`,
       });
       return;
     }
@@ -217,7 +249,7 @@ router.patch(
       id_cabang: updated!.id_cabang,
       status: updated!.status,
       nominal: updated!.nominal,
-      message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} dari ${branch?.nama_cabang ?? expense.id_cabang} ditolak.`,
+      message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} (${expense.kategori}) dari ${branch?.nama_cabang ?? expense.id_cabang} ditolak.`,
     });
   },
 );

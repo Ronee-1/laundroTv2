@@ -1,11 +1,21 @@
 export type ExpenseStatus = 'Pending' | 'Approve' | 'Reject';
 
+export type ExpenseCategory =
+  | 'Gaji'
+  | 'Sewa'
+  | 'Listrik'
+  | 'Logistik'
+  | 'Dana Darurat'
+  | 'Lainnya';
+
 export interface Expense {
   id_expense: string;
   id_cabang: string;
+  tanggal: Date;
   nominal: number;
   deskripsi: string;
-  kategori: 'Operasional' | 'Dana Darurat' | 'Stok' | 'Mutasi';
+  kategori: ExpenseCategory;
+  bukti_nota_url: string;
   status: ExpenseStatus;
   tanggal_pengajuan: Date;
   tanggal_approval?: Date;
@@ -18,16 +28,20 @@ const EXPENSES: Expense[] = [];
 
 export function createExpense(params: {
   id_cabang: string;
+  tanggal: Date;
   nominal: number;
   deskripsi: string;
-  kategori: Expense['kategori'];
+  kategori: ExpenseCategory;
+  bukti_nota_url: string;
 }): Expense {
   const expense: Expense = {
     id_expense: `EXP-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
     id_cabang: params.id_cabang,
+    tanggal: params.tanggal,
     nominal: params.nominal,
     deskripsi: params.deskripsi,
     kategori: params.kategori,
+    bukti_nota_url: params.bukti_nota_url,
     status: 'Pending',
     tanggal_pengajuan: new Date(),
     created_at: new Date(),
@@ -67,4 +81,22 @@ export function updateExpenseStatus(
 
 export function getAllExpenses(): Expense[] {
   return [...EXPENSES];
+}
+
+export function getExpensesByBranchAndCategory(id_cabang: string): Record<ExpenseCategory, number> {
+  const expenses = getExpensesByBranch(id_cabang).filter((e) => e.status === 'Approve');
+  const breakdown: Record<ExpenseCategory, number> = {
+    Gaji: 0,
+    Sewa: 0,
+    Listrik: 0,
+    Logistik: 0,
+    'Dana Darurat': 0,
+    Lainnya: 0,
+  };
+
+  for (const expense of expenses) {
+    breakdown[expense.kategori] += expense.nominal;
+  }
+
+  return breakdown;
 }

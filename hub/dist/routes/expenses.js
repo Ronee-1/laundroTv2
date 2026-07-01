@@ -6,12 +6,20 @@ const expense_js_1 = require("../services/expense.js");
 const branches_js_1 = require("../config/branches.js");
 const cashbook_js_1 = require("../services/cashbook.js");
 const router = (0, express_1.Router)();
+const VALID_CATEGORIES = ['Gaji', 'Sewa', 'Listrik', 'Logistik', 'Dana Darurat', 'Lainnya'];
 router.post('/request', (req, res) => {
-    const { id_cabang, nominal, deskripsi, kategori } = req.body;
-    if (!id_cabang || !nominal || !deskripsi || !kategori) {
+    const { id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url } = req.body;
+    if (!id_cabang || !tanggal || !nominal || !deskripsi || !kategori || !bukti_nota_url) {
         res.status(400).json({
             success: false,
-            error: 'Field wajib: id_cabang, nominal, deskripsi, kategori.',
+            error: 'Field wajib: id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url.',
+        });
+        return;
+    }
+    if (!VALID_CATEGORIES.includes(kategori)) {
+        res.status(400).json({
+            success: false,
+            error: `Kategori tidak valid. Kategori yang diizinkan: ${VALID_CATEGORIES.join(', ')}`,
         });
         return;
     }
@@ -30,6 +38,14 @@ router.post('/request', (req, res) => {
         });
         return;
     }
+    const parsedDate = new Date(tanggal);
+    if (isNaN(parsedDate.getTime())) {
+        res.status(400).json({
+            success: false,
+            error: 'Format tanggal tidak valid. Gunakan format ISO 8601.',
+        });
+        return;
+    }
     const budgetCheck = (0, budget_js_1.checkOverbudget)(id_cabang, nominal);
     if (budgetCheck.overbudget) {
         res.status(400).json({
@@ -45,15 +61,24 @@ router.post('/request', (req, res) => {
         });
         return;
     }
-    const expense = (0, expense_js_1.createExpense)({ id_cabang, nominal, deskripsi, kategori });
+    const expense = (0, expense_js_1.createExpense)({
+        id_cabang,
+        tanggal: parsedDate,
+        nominal,
+        deskripsi,
+        kategori,
+        bukti_nota_url,
+    });
     res.status(201).json({
         success: true,
         id_expense: expense.id_expense,
         id_cabang: expense.id_cabang,
         status: expense.status,
         nominal: expense.nominal,
+        kategori: expense.kategori,
+        tanggal: expense.tanggal.toISOString(),
         sisa_pagu: budgetCheck.sisa_pagu,
-        message: `Pengajuan pengeluaran Rp${nominal.toLocaleString('id-ID')} dari ${branch.nama_cabang} berhasil dicatat. Menunggu persetujuan Admin Pusat.`,
+        message: `Pengajuan pengeluaran Rp${nominal.toLocaleString('id-ID')} (${kategori}) dari ${branch.nama_cabang} berhasil dicatat. Menunggu persetujuan Admin Pusat.`,
     });
 });
 router.patch('/:id_expense/approve', (req, res) => {
@@ -113,7 +138,7 @@ router.patch('/:id_expense/approve', (req, res) => {
                 tipe: journal.tipe,
                 deskripsi: journal.deskripsi,
             },
-            message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} dari ${branch?.nama_cabang ?? expense.id_cabang} disetujui. Pagu cabang telah dikurangi dan jurnal tercatat di Buku Kas Pusat.`,
+            message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} (${expense.kategori}) dari ${branch?.nama_cabang ?? expense.id_cabang} disetujui. Pagu cabang telah dikurangi dan jurnal tercatat di Buku Kas Pusat.`,
         });
         return;
     }
@@ -124,7 +149,7 @@ router.patch('/:id_expense/approve', (req, res) => {
         id_cabang: updated.id_cabang,
         status: updated.status,
         nominal: updated.nominal,
-        message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} dari ${branch?.nama_cabang ?? expense.id_cabang} ditolak.`,
+        message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} (${expense.kategori}) dari ${branch?.nama_cabang ?? expense.id_cabang} ditolak.`,
     });
 });
 exports.default = router;
