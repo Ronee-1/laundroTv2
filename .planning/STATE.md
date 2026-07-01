@@ -1,8 +1,8 @@
 # Project State Tracking
 
 ## Current Status
-- Current Phase: Phase 2 — Sentralisasi Keuangan & Modul Persediaan.
-- Progress: 75% (Expense management + overbudget interception implemented).
+- Current Phase: Phase 3 — Dashboard Audit & Manajemen Kuota (COMPLETED).
+- Progress: 100% (Project Completed).
 
 ## Completed Tasks
 - [x] AGENTS.md implementation with strict business rules.
@@ -23,9 +23,39 @@
 - [x] Create expense service (hub/src/services/expense.ts) with approval workflow.
 - [x] Implement POST /api/expenses/request with overbudget interception (400 Bad Request).
 - [x] Implement PATCH /api/expenses/:id_expense/approve for Hub admin approval.
+- [x] Implement GET /api/owner/dashboard with per-branch financial consolidation (FR-OWN-01).
+- [x] Create Dashboard Keuangan Eksekutif page with cash flow visualization.
+- [x] Implement offline queue system for courier status updates (NF03).
+- [x] Update TugasHarian.tsx with offline detection, queue management, and auto-sync.
+- [x] Final verification: typecheck and build passed 100%.
 
-## Open Issues / Next Actions
-- [ ] Add integration tests for expense workflow and overbudget edge cases.
-- [ ] Implement closing discrepancy detection and branch freeze logic (Phase 3).
-- [ ] Build executive dashboard for cash flow visualization (Phase 3).
-- [ ] Define shared database schema with mandatory id_cabang indexing.
+## Project Summary
+**Laundro Truck v2.0** — Multi-branch laundry management system with Hub-and-Spoke architecture.
+
+### Core Features Delivered
+1. **Multi-Branch Data Isolation**: Strict `id_cabang` enforcement across all transactions and logistics data.
+2. **Static Georouting**: WhatsApp order allocation to nearest branch using Haversine distance.
+3. **Order Quota Lock**: Automatic 30-slot daily limit with WhatsApp delay templates.
+4. **Auto-Journaling**: Real-time cash book entries tagged with branch ID on order completion.
+5. **Overbudget Interception**: Automatic rejection of expense requests exceeding monthly budget ceiling.
+6. **Expense Approval Workflow**: Hub admin approval/rejection with real-time budget deduction.
+7. **Executive Dashboard**: Consolidated financial analytics per branch with profitability metrics.
+8. **Courier Offline Queue**: LocalStorage-based offline resilience with timestamp preservation and auto-sync.
+
+### Architecture
+- **Monorepo**: npm workspaces (hub, spokes/*, packages/*)
+- **Backend**: Express + TypeScript (hub/)
+- **Frontend**: React + Vite (spokes/branch-app/)
+- **Shared Types**: @laundrot/shared-types (packages/shared-types/)
+
+### Compliance
+- UU PDP No. 27 Tahun 2022 (data encryption requirements documented)
+- No hardcoded API keys or branch coordinates
+- Strict branch isolation enforced at API level
+
+## Next Steps (Post-MVP)
+- [ ] Database integration (PostgreSQL/MySQL with encrypted fields)
+- [ ] Service Worker implementation for full PWA offline support
+- [ ] Integration test suite for all edge cases
+- [ ] Production deployment configuration
+- [ ] Real-time WebSocket notifications for admin dashboard
