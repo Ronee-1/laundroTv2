@@ -1,6 +1,10 @@
 import { Router, type Request, type Response } from 'express';
+import type { OrderStatus } from '@laundrot/shared-types';
 import { findNearestBranch } from '../services/georouting.js';
 import { checkQuota, generateDelayMessage, getNextBusinessDay } from '../services/quota.js';
+import { updateOrderStatus } from '../config/orders.js';
+import { createJournalEntry } from '../services/cashbook.js';
+import { getBranchById } from '../config/branches.js';
 
 const router = Router();
 
@@ -113,5 +117,101 @@ router.post('/allocate', (req: Request<{}, AllocateResponse, AllocateOrderBody>,
     message: `Pesanan dari "${alamat_pelanggan}" dialokasikan ke ${nearest.branch.nama_cabang} (${Math.round(nearest.distance_km * 100) / 100} km).`,
   });
 });
+
+const VALID_STATUSES: OrderStatus[] = [
+  'Pending',
+  'Diproses',
+  'Siap Diantar',
+  'Dalam Pengiriman',
+  'Selesai',
+  'Lunas',
+  'Dibatalkan',
+];
+
+interface UpdateStatusBody {
+  status: OrderStatus;
+}
+
+interface UpdateStatusResponse {
+  success: boolean;
+  id_order: string;
+  status: string;
+  id_cabang: string;
+  journal?: {
+    id_jurnal: string;
+    nominal: number;
+    tipe: string;
+    deskripsi: string;
+    tanggal_jurnal: string;
+  };
+  message: string;
+}
+
+router.patch(
+  '/:id_order/status',
+  (req: Request<{ id_order: string }, UpdateStatusResponse, UpdateStatusBody>, res: Response<UpdateStatusResponse>) => {
+    const { id_order } = req.params;
+    const { status } = req.body;
+
+    if (!status || !VALID_STATUSES.includes(status)) {
+      res.status(400).json({
+        success: false,
+        id_order,
+        status: '',
+        id_cabang: '',
+        message: `Status tidak valid. Status yang diizinkan: ${VALID_STATUSES.join(', ')}`,
+      });
+      return;
+    }
+
+    const updatedOrder = updateOrderStatus(id_order, status);
+
+    if (!updatedOrder) {
+      res.status(404).json({
+        success: false,
+        id_order,
+        status: '',
+        id_cabang: '',
+        message: `Pesanan dengan ID "${id_order}" tidak ditemukan.`,
+      });
+      return;
+    }
+
+    let journal = undefined;
+
+    if (status === 'Selesai' || status === 'Lunas') {
+      const branch = getBranchById(updatedOrder.id_cabang);
+      const nominal = updatedOrder.total_harga ?? 0;
+
+      const entry = createJournalEntry({
+        id_cabang: updatedOrder.id_cabang,
+        id_transaksi: updatedOrder.id_order,
+        nominal,
+        tipe: 'Pemasukan',
+        deskripsi: `Pendapatan pesanan ${updatedOrder.id_order} dari ${branch?.nama_cabang ?? updatedOrder.id_cabang}`,
+      });
+
+      journal = {
+        id_jurnal: entry.id_jurnal,
+        nominal: entry.nominal,
+        tipe: entry.tipe,
+        deskripsi: entry.deskripsi,
+        tanggal_jurnal: entry.tanggal_jurnal.toISOString(),
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      id_order: updatedOrder.id_order,
+      status: updatedOrder.status,
+      id_cabang: updatedOrder.id_cabang,
+      journal,
+      message:
+        journal
+          ? `Status pesanan diubah menjadi "${status}". Jurnal otomatis tercatat di Buku Kas Pusat.`
+          : `Status pesanan diubah menjadi "${status}".`,
+    });
+  },
+);
 
 export default router;

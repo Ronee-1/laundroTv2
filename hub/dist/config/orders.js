@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ORDERS = void 0;
 exports.getOrdersByCourier = getOrdersByCourier;
 exports.getOrdersByBranch = getOrdersByBranch;
+exports.getOrderById = getOrderById;
+exports.updateOrderStatus = updateOrderStatus;
 exports.ORDERS = [
     {
         id_order: 'ORD-001',
@@ -74,5 +76,19 @@ function getOrdersByCourier(id_kurir, id_cabang) {
 }
 function getOrdersByBranch(id_cabang) {
     return exports.ORDERS.filter((o) => o.id_cabang === id_cabang);
+}
+function getOrderById(id_order) {
+    return exports.ORDERS.find((o) => o.id_order === id_order);
+}
+function updateOrderStatus(id_order, newStatus) {
+    const order = getOrderById(id_order);
+    if (!order)
+        return null;
+    order.status = newStatus;
+    order.updated_at = new Date();
+    if (newStatus === 'Selesai' || newStatus === 'Lunas') {
+        order.tanggal_selesai = new Date();
+    }
+    return order;
 }
 //# sourceMappingURL=orders.js.map

@@ -1,8 +1,8 @@
 # Project State Tracking
 
 ## Current Status
-- Current Phase: Phase 1 — Arsitektur Multi-Cabang & Georouting.
-- Progress: 55% (Courier task isolation + frontend Tugas Harian page implemented).
+- Current Phase: Phase 2 — Sentralisasi Keuangan & Modul Persediaan.
+- Progress: 65% (Auto-journaling to Central Cash Book implemented).
 
 ## Completed Tasks
 - [x] AGENTS.md implementation with strict business rules.
@@ -16,8 +16,12 @@
 - [x] Implement Order Quota Lock (30 daily slots) with WhatsApp delay template.
 - [x] Implement GET /api/couriers/:id_kurir/tasks with strict branch data isolation (NF01).
 - [x] Create spokes/branch-app/ React frontend with Tugas Harian page (FR-LOG-03).
+- [x] Implement PATCH /api/orders/:id_order/status endpoint.
+- [x] Implement auto-journaling logic (Selesai/Lunas → CashBookEntry with id_cabang tag).
+- [x] Create cashbook service (hub/src/services/cashbook.ts) with mock storage.
 
 ## Open Issues / Next Actions
+- [ ] Implement emergency expense approval workflow (F05).
+- [ ] Implement overbudget interception logic (F06).
+- [ ] Add integration tests for auto-journaling and cash book entries.
 - [ ] Define shared database schema with mandatory id_cabang indexing.
-- [ ] Add integration tests for georouting, quota, and branch isolation edge cases.
-- [ ] Add Service Worker scaffold for courier offline queue (Phase 3 — NF03).

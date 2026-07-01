@@ -1,4 +1,4 @@
-import type { Order } from '@laundrot/shared-types';
+import type { Order, OrderStatus } from '@laundrot/shared-types';
 
 export const ORDERS: Order[] = [
   {
@@ -73,4 +73,22 @@ export function getOrdersByCourier(id_kurir: string, id_cabang: string): Order[]
 
 export function getOrdersByBranch(id_cabang: string): Order[] {
   return ORDERS.filter((o) => o.id_cabang === id_cabang);
+}
+
+export function getOrderById(id_order: string): Order | undefined {
+  return ORDERS.find((o) => o.id_order === id_order);
+}
+
+export function updateOrderStatus(id_order: string, newStatus: OrderStatus): Order | null {
+  const order = getOrderById(id_order);
+  if (!order) return null;
+
+  order.status = newStatus;
+  order.updated_at = new Date();
+
+  if (newStatus === 'Selesai' || newStatus === 'Lunas') {
+    order.tanggal_selesai = new Date();
+  }
+
+  return order;
 }
