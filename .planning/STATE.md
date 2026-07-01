@@ -1,8 +1,8 @@
 # Project State Tracking
 
 ## Current Status
-- Current Phase: Phase 3 — Dashboard Audit & Manajemen Kuota (COMPLETED).
-- Progress: 100% (Project Completed).
+- Current Phase: Phase 3 — Dashboard Audit & Manajemen Kuota (REVISION IN PROGRESS).
+- Progress: 70% (Scope revised per dosen feedback — FR-OWN-02 & FR-FIN-08 pending implementation).
 
 ## Completed Tasks
 - [x] AGENTS.md implementation with strict business rules.
@@ -59,3 +59,9 @@
 - [ ] Integration test suite for all edge cases
 - [ ] Production deployment configuration
 - [ ] Real-time WebSocket notifications for admin dashboard
+
+## Pending Revisions (Dosen Feedback)
+- [ ] Implement FR-OWN-02: Multi-Branch Analytics Dashboard with KPI data points per branch.
+- [ ] Implement FR-FIN-08: Comprehensive Expense Tracker form (tanggal, nominal, kategori kustom, cabang asal, bukti nota).
+- [ ] Add visual alert/warning system on central dashboard.
+- [ ] Build two-directional Cash Flow report module.

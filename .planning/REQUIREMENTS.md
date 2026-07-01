@@ -8,6 +8,8 @@
 - **F05**: Admin Pusat memiliki antarmuka untuk menyetujui (Approve) atau menolak (Reject) permohonan pengeluaran darurat dari cabang.
 - **F06**: Sistem otomatis menolak input pengeluaran operasional cabang dan menampilkan error Overbudget jika melampaui sisa pagu bulanan dari Hub.
 - **F07**: Pemilik dapat melihat grafik tren arus kas terpadu dan performa profitabilitas yang dipisah per masing-masing cabang di Dashboard Utama Eksekutif.
+- **FR-OWN-02**: Sistem harus menampilkan visualisasi data poin/titik KPI performa seluruh cabang agar Admin Pusat mudah mengidentifikasi cabang yang membutuhkan bantuan cepat.
+- **FR-FIN-08**: Menyediakan formulir input pengeluaran operasional harian (tanggal, nominal, kategori kustom seperti listrik/gaji/logistik, cabang asal, dan bukti nota).
 
 ## Non-Functional Requirements (NF-IDs)
 - **NF01**: Struktur database wajib menyertakan indeks id_cabang pada setiap tabel relasional transaksi keuangan dan logistik.

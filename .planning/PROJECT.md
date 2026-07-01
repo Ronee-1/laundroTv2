@@ -15,6 +15,8 @@ Pengelola Operasional Laundry tidak memiliki sistem terintegrasi yang mampu meng
 - Isolasi dashboard kurir dan admin cabang (hanya melihat data cabangnya sendiri).
 - Modul pengajuan mutasi/stok/dana darurat dari cabang ke Hub.
 - Sistem batas kuota harian (Order Quota & Queue) per cabang.
+- Sistem Alert/Peringatan visual pada dashboard pusat.
+- Modul Laporan Arus Kas (Cash Flow) dua arah.
 
 ### OUT of Scope
 - Fitur berbagi armada (fleet sharing) atau kurir antar-cabang secara dinamika.
