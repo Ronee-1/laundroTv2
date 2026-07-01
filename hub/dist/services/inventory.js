@@ -1,0 +1,104 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getInventoryByBranch = getInventoryByBranch;
+exports.getAllInventory = getAllInventory;
+exports.getInventoryStatus = getInventoryStatus;
+exports.restockInventory = restockInventory;
+function determineStatus(stok, threshold) {
+    if (stok <= 0)
+        return 'Habis';
+    if (stok <= threshold)
+        return 'Menipis';
+    return 'Aman';
+}
+function refreshStatuses(stocks) {
+    return stocks.map((s) => ({
+        ...s,
+        status: determineStatus(s.stok_saat_ini, s.safety_threshold),
+    }));
+}
+const INVENTORY = [
+    {
+        id_cabang: 'CBG-001',
+        stocks: refreshStatuses([
+            { item: 'Detergen', satuan: 'L', stok_saat_ini: 45, safety_threshold: 15, status: 'Aman' },
+            { item: 'Pelembut', satuan: 'L', stok_saat_ini: 30, safety_threshold: 15, status: 'Aman' },
+            { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 120, safety_threshold: 30, status: 'Aman' },
+        ]),
+        last_updated: new Date(),
+    },
+    {
+        id_cabang: 'CBG-002',
+        stocks: refreshStatuses([
+            { item: 'Detergen', satuan: 'L', stok_saat_ini: 12, safety_threshold: 15, status: 'Aman' },
+            { item: 'Pelembut', satuan: 'L', stok_saat_ini: 25, safety_threshold: 15, status: 'Aman' },
+            { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 18, safety_threshold: 30, status: 'Aman' },
+        ]),
+        last_updated: new Date(),
+    },
+    {
+        id_cabang: 'CBG-003',
+        stocks: refreshStatuses([
+            { item: 'Detergen', satuan: 'L', stok_saat_ini: 22, safety_threshold: 15, status: 'Aman' },
+            { item: 'Pelembut', satuan: 'L', stok_saat_ini: 14, safety_threshold: 15, status: 'Aman' },
+            { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 85, safety_threshold: 30, status: 'Aman' },
+        ]),
+        last_updated: new Date(),
+    },
+    {
+        id_cabang: 'CBG-004',
+        stocks: refreshStatuses([
+            { item: 'Detergen', satuan: 'L', stok_saat_ini: 40, safety_threshold: 15, status: 'Aman' },
+            { item: 'Pelembut', satuan: 'L', stok_saat_ini: 35, safety_threshold: 15, status: 'Aman' },
+            { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 110, safety_threshold: 30, status: 'Aman' },
+        ]),
+        last_updated: new Date(),
+    },
+    {
+        id_cabang: 'CBG-005',
+        stocks: refreshStatuses([
+            { item: 'Detergen', satuan: 'L', stok_saat_ini: 8, safety_threshold: 15, status: 'Aman' },
+            { item: 'Pelembut', satuan: 'L', stok_saat_ini: 9, safety_threshold: 15, status: 'Aman' },
+            { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 45, safety_threshold: 30, status: 'Aman' },
+        ]),
+        last_updated: new Date(),
+    },
+];
+function getInventoryByBranch(id_cabang) {
+    return INVENTORY.find((inv) => inv.id_cabang === id_cabang);
+}
+function getAllInventory() {
+    return [...INVENTORY];
+}
+function getInventoryStatus(id_cabang) {
+    const inventory = getInventoryByBranch(id_cabang);
+    if (!inventory)
+        return 'Habis';
+    const hasHabis = inventory.stocks.some((s) => s.status === 'Habis');
+    if (hasHabis)
+        return 'Habis';
+    const hasMenipis = inventory.stocks.some((s) => s.status === 'Menipis');
+    if (hasMenipis)
+        return 'Menipis';
+    return 'Aman';
+}
+function restockInventory(id_cabang, additions) {
+    const inventory = getInventoryByBranch(id_cabang);
+    if (!inventory)
+        return null;
+    for (const stock of inventory.stocks) {
+        if (stock.item === 'Detergen' && additions.detergen) {
+            stock.stok_saat_ini += additions.detergen;
+        }
+        if (stock.item === 'Pelembut' && additions.pelembut) {
+            stock.stok_saat_ini += additions.pelembut;
+        }
+        if (stock.item === 'Plastik' && additions.plastik) {
+            stock.stok_saat_ini += additions.plastik;
+        }
+        stock.status = determineStatus(stock.stok_saat_ini, stock.safety_threshold);
+    }
+    inventory.last_updated = new Date();
+    return inventory;
+}
+//# sourceMappingURL=inventory.js.map

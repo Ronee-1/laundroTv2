@@ -6,20 +6,20 @@ const expense_js_1 = require("../services/expense.js");
 const branches_js_1 = require("../config/branches.js");
 const cashbook_js_1 = require("../services/cashbook.js");
 const router = (0, express_1.Router)();
-const VALID_CATEGORIES = ['Gaji', 'Sewa', 'Listrik', 'Logistik', 'Dana Darurat', 'Lainnya'];
 router.post('/request', (req, res) => {
     const { id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url } = req.body;
-    if (!id_cabang || !tanggal || !nominal || !deskripsi || !kategori || !bukti_nota_url) {
+    if (!id_cabang || !tanggal || !nominal || !deskripsi || !kategori) {
         res.status(400).json({
             success: false,
-            error: 'Field wajib: id_cabang, tanggal, nominal, deskripsi, kategori, bukti_nota_url.',
+            error: 'Field wajib: id_cabang, tanggal, nominal, deskripsi, kategori.',
         });
         return;
     }
-    if (!VALID_CATEGORIES.includes(kategori)) {
+    const validCategories = (0, expense_js_1.getCategories)();
+    if (!validCategories.includes(kategori)) {
         res.status(400).json({
             success: false,
-            error: `Kategori tidak valid. Kategori yang diizinkan: ${VALID_CATEGORIES.join(', ')}`,
+            error: `Kategori tidak valid. Kategori yang diizinkan: ${validCategories.join(', ')}`,
         });
         return;
     }
@@ -48,16 +48,21 @@ router.post('/request', (req, res) => {
     }
     const budgetCheck = (0, budget_js_1.checkOverbudget)(id_cabang, nominal);
     if (budgetCheck.overbudget) {
+        const formatIDR = (n) => new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+        }).format(n);
         res.status(400).json({
             success: false,
-            error: 'Overbudget Error',
+            error: 'PROSES DITOLAK: Overbudget!',
             id_cabang,
             nominal,
             pagu_anggaran: budgetCheck.pagu_anggaran,
             terpakai: budgetCheck.terpakai,
             sisa_pagu: budgetCheck.sisa_pagu,
             projected_total: budgetCheck.projected_total,
-            message: `Pengeluaran Rp${nominal.toLocaleString('id-ID')} melebihi sisa pagu Rp${budgetCheck.sisa_pagu.toLocaleString('id-ID')} dari cabang ${branch.nama_cabang}. Total pengeluaran akan menjadi Rp${budgetCheck.projected_total.toLocaleString('id-ID')} (pagu: Rp${budgetCheck.pagu_anggaran.toLocaleString('id-ID')}).`,
+            message: `PROSES DITOLAK: Overbudget! Pengeluaran ini (${formatIDR(nominal)}) melebihi sisa pagu anggaran bulanan ${branch.nama_cabang} yang tersisa sebesar ${formatIDR(budgetCheck.sisa_pagu)}.`,
         });
         return;
     }
@@ -67,7 +72,7 @@ router.post('/request', (req, res) => {
         nominal,
         deskripsi,
         kategori,
-        bukti_nota_url,
+        bukti_nota_url: bukti_nota_url ?? '',
     });
     res.status(201).json({
         success: true,
@@ -150,6 +155,29 @@ router.patch('/:id_expense/approve', (req, res) => {
         status: updated.status,
         nominal: updated.nominal,
         message: `Pengajuan pengeluaran Rp${expense.nominal.toLocaleString('id-ID')} (${expense.kategori}) dari ${branch?.nama_cabang ?? expense.id_cabang} ditolak.`,
+    });
+});
+router.get('/categories', (_req, res) => {
+    res.status(200).json({
+        success: true,
+        categories: (0, expense_js_1.getCategories)(),
+    });
+});
+router.post('/categories', (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+        res.status(400).json({ success: false, message: 'Nama kategori wajib diisi.' });
+        return;
+    }
+    const added = (0, expense_js_1.addCategory)(name.trim());
+    if (!added) {
+        res.status(400).json({ success: false, message: 'Kategori sudah ada!' });
+        return;
+    }
+    res.status(201).json({
+        success: true,
+        message: 'Kategori pengeluaran kustom berhasil ditambahkan.',
+        categories: (0, expense_js_1.getCategories)(),
     });
 });
 exports.default = router;

@@ -10,6 +10,11 @@
 - **F07**: Pemilik dapat melihat grafik tren arus kas terpadu dan performa profitabilitas yang dipisah per masing-masing cabang di Dashboard Utama Eksekutif.
 - **FR-OWN-02**: Sistem harus menampilkan visualisasi data poin/titik KPI performa seluruh cabang agar Admin Pusat mudah mengidentifikasi cabang yang membutuhkan bantuan cepat.
 - **FR-FIN-08**: Menyediakan formulir input pengeluaran operasional harian (tanggal, nominal, kategori kustom seperti listrik/gaji/logistik, cabang asal, dan bukti nota).
+- **FR-012**: Modul Pengeluaran (Expense Tracker) komprehensif yang mencatat seluruh pengeluaran operasional harian cabang dengan validasi kategori dan bukti nota.
+- **FR-013**: Modul Pengeluaran terikat kontrol pagu anggaran bulanan — setiap pengajuan pengeluaran otomatis dicek terhadap sisa pagu cabang bersangkutan.
+- **FR-014**: Dasbor Peta Interaktif "Banyak Titik" wilayah Jabodetabek dengan pin berwarna dinamis (Hijau = Aman, Kuning = Peringatan, Merah = Kritis) berdasarkan status budget dan stok inventaris.
+- **FR-INV-01**: Modul Pengawasan Inventaris — pelacakan stok bahan baku harian (detergen, pelembut, plastik) per cabang dengan safety threshold otomatis; sistem memberi peringatan jika stok di bawah batas minimum.
+- **FR-FIN-09**: Audit & Rekonsiliasi Kas — formulir input kas fisik vs kas digital harian, sistem menghitung selisih (discrepancy) dan menyimpan log audit untuk deteksi kebocoran dana.
 
 ## Non-Functional Requirements (NF-IDs)
 - **NF01**: Struktur database wajib menyertakan indeks id_cabang pada setiap tabel relasional transaksi keuangan dan logistik.

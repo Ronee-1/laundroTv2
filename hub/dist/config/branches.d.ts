@@ -1,5 +1,9 @@
 import type { Branch } from '@laundrot/shared-types';
-export declare const BRANCHES: Branch[];
-export declare function getActiveBranches(): Branch[];
-export declare function getBranchById(id_cabang: string): Branch | undefined;
+export interface BranchWithFinancials extends Branch {
+    omzet: number;
+    wilayah: string;
+}
+export declare const BRANCHES: BranchWithFinancials[];
+export declare function getActiveBranches(): BranchWithFinancials[];
+export declare function getBranchById(id_cabang: string): BranchWithFinancials | undefined;
 //# sourceMappingURL=branches.d.ts.map
