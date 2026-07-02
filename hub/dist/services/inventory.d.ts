@@ -4,6 +4,7 @@ export interface StockEntry {
     satuan: string;
     stok_saat_ini: number;
     safety_threshold: number;
+    max_capacity: number;
     status: 'Aman' | 'Menipis' | 'Habis';
 }
 export interface BranchInventory {

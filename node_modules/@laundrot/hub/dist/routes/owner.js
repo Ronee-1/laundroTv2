@@ -6,6 +6,7 @@ const cashbook_js_1 = require("../services/cashbook.js");
 const expense_js_1 = require("../services/expense.js");
 const budget_js_1 = require("../services/budget.js");
 const inventory_js_1 = require("../services/inventory.js");
+const logistics_js_1 = require("../services/logistics.js");
 const router = (0, express_1.Router)();
 function determineHealthStatus(utilization_percent, inventoryStatus) {
     if (utilization_percent >= 90 || inventoryStatus === 'Habis')
@@ -64,6 +65,8 @@ router.get('/dashboard', (_req, res) => {
         const inventoryStatus = (0, inventory_js_1.getInventoryStatus)(branch.id_cabang);
         const pin_color = determineMapPinColor(rounded_utilization, inventoryStatus);
         const health_status = determineHealthStatus(rounded_utilization, inventoryStatus);
+        const inTransitLogs = (0, logistics_js_1.getActiveShipmentsByBranch)(branch.id_cabang);
+        const replenishment = (0, logistics_js_1.getReplenishmentRecommendation)(branch.id_cabang);
         return {
             id_cabang: branch.id_cabang,
             nama_cabang: branch.nama_cabang,
@@ -88,6 +91,16 @@ router.get('/dashboard', (_req, res) => {
             inventory: {
                 stocks: inventoryData?.stocks ?? [],
                 overall_status: inventoryStatus,
+            },
+            in_transit: inTransitLogs.map((l) => ({
+                id: l.id,
+                sentItems: l.sentItems,
+                status: l.status,
+                timestamp: l.timestamp.toISOString(),
+            })),
+            replenishment: {
+                needs_replenishment: replenishment.needs_replenishment,
+                items: replenishment.items,
             },
         };
     });

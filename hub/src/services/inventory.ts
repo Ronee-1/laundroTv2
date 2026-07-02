@@ -5,6 +5,7 @@ export interface StockEntry {
   satuan: string;
   stok_saat_ini: number;
   safety_threshold: number;
+  max_capacity: number;
   status: 'Aman' | 'Menipis' | 'Habis';
 }
 
@@ -31,45 +32,45 @@ const INVENTORY: BranchInventory[] = [
   {
     id_cabang: 'CBG-001',
     stocks: refreshStatuses([
-      { item: 'Detergen', satuan: 'L', stok_saat_ini: 45, safety_threshold: 15, status: 'Aman' },
-      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 30, safety_threshold: 15, status: 'Aman' },
-      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 120, safety_threshold: 30, status: 'Aman' },
+      { item: 'Detergen', satuan: 'L', stok_saat_ini: 45, safety_threshold: 15, max_capacity: 100, status: 'Aman' },
+      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 30, safety_threshold: 15, max_capacity: 80, status: 'Aman' },
+      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 120, safety_threshold: 30, max_capacity: 200, status: 'Aman' },
     ]),
     last_updated: new Date(),
   },
   {
     id_cabang: 'CBG-002',
     stocks: refreshStatuses([
-      { item: 'Detergen', satuan: 'L', stok_saat_ini: 12, safety_threshold: 15, status: 'Aman' },
-      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 25, safety_threshold: 15, status: 'Aman' },
-      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 18, safety_threshold: 30, status: 'Aman' },
+      { item: 'Detergen', satuan: 'L', stok_saat_ini: 12, safety_threshold: 15, max_capacity: 100, status: 'Aman' },
+      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 25, safety_threshold: 15, max_capacity: 80, status: 'Aman' },
+      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 18, safety_threshold: 30, max_capacity: 200, status: 'Aman' },
     ]),
     last_updated: new Date(),
   },
   {
     id_cabang: 'CBG-003',
     stocks: refreshStatuses([
-      { item: 'Detergen', satuan: 'L', stok_saat_ini: 22, safety_threshold: 15, status: 'Aman' },
-      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 14, safety_threshold: 15, status: 'Aman' },
-      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 85, safety_threshold: 30, status: 'Aman' },
+      { item: 'Detergen', satuan: 'L', stok_saat_ini: 22, safety_threshold: 15, max_capacity: 100, status: 'Aman' },
+      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 14, safety_threshold: 15, max_capacity: 80, status: 'Aman' },
+      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 85, safety_threshold: 30, max_capacity: 200, status: 'Aman' },
     ]),
     last_updated: new Date(),
   },
   {
     id_cabang: 'CBG-004',
     stocks: refreshStatuses([
-      { item: 'Detergen', satuan: 'L', stok_saat_ini: 40, safety_threshold: 15, status: 'Aman' },
-      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 35, safety_threshold: 15, status: 'Aman' },
-      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 110, safety_threshold: 30, status: 'Aman' },
+      { item: 'Detergen', satuan: 'L', stok_saat_ini: 40, safety_threshold: 15, max_capacity: 100, status: 'Aman' },
+      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 35, safety_threshold: 15, max_capacity: 80, status: 'Aman' },
+      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 110, safety_threshold: 30, max_capacity: 200, status: 'Aman' },
     ]),
     last_updated: new Date(),
   },
   {
     id_cabang: 'CBG-005',
     stocks: refreshStatuses([
-      { item: 'Detergen', satuan: 'L', stok_saat_ini: 8, safety_threshold: 15, status: 'Aman' },
-      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 9, safety_threshold: 15, status: 'Aman' },
-      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 45, safety_threshold: 30, status: 'Aman' },
+      { item: 'Detergen', satuan: 'L', stok_saat_ini: 8, safety_threshold: 15, max_capacity: 100, status: 'Aman' },
+      { item: 'Pelembut', satuan: 'L', stok_saat_ini: 9, safety_threshold: 15, max_capacity: 80, status: 'Aman' },
+      { item: 'Plastik', satuan: 'pcs', stok_saat_ini: 45, safety_threshold: 30, max_capacity: 200, status: 'Aman' },
     ]),
     last_updated: new Date(),
   },
@@ -105,13 +106,13 @@ export function restockInventory(
 
   for (const stock of inventory.stocks) {
     if (stock.item === 'Detergen' && additions.detergen) {
-      stock.stok_saat_ini += additions.detergen;
+      stock.stok_saat_ini = Math.min(stock.stok_saat_ini + additions.detergen, stock.max_capacity);
     }
     if (stock.item === 'Pelembut' && additions.pelembut) {
-      stock.stok_saat_ini += additions.pelembut;
+      stock.stok_saat_ini = Math.min(stock.stok_saat_ini + additions.pelembut, stock.max_capacity);
     }
     if (stock.item === 'Plastik' && additions.plastik) {
-      stock.stok_saat_ini += additions.plastik;
+      stock.stok_saat_ini = Math.min(stock.stok_saat_ini + additions.plastik, stock.max_capacity);
     }
     stock.status = determineStatus(stock.stok_saat_ini, stock.safety_threshold);
   }

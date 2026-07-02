@@ -1,6 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 import { getBranchById } from '../config/branches.js';
-import { createReconciliation, getReconciliationByBranch } from '../services/reconciliation.js';
+import {
+  createReconciliation,
+  getReconciliationByBranch,
+  getAllReconciliations,
+  getReconciliationById,
+  approveReconciliation,
+  rejectReconciliation,
+  overrideReconciliation,
+} from '../services/reconciliation.js';
 import { getTotalApprovedExpenses } from '../services/expense.js';
 import { restockInventory, getInventoryByBranch } from '../services/inventory.js';
 
@@ -20,6 +28,7 @@ interface ReconcileSuccessResponse {
   kas_fisik: number;
   selisih: number;
   status: string;
+  approval_status: string;
   message: string;
 }
 
@@ -90,6 +99,7 @@ router.post(
       kas_fisik: log.kas_fisik,
       selisih: log.selisih,
       status: log.status,
+      approval_status: log.approval_status,
       message: statusMessage,
     });
   },
@@ -106,7 +116,9 @@ interface HistoryResponse {
     kas_fisik: number;
     selisih: number;
     status: string;
+    approval_status: string;
     catatan?: string;
+    catatan_owner?: string;
   }>;
 }
 
@@ -137,8 +149,167 @@ router.get(
         kas_fisik: log.kas_fisik,
         selisih: log.selisih,
         status: log.status,
+        approval_status: log.approval_status,
         catatan: log.catatan,
+        catatan_owner: log.catatan_owner,
       })),
+    });
+  },
+);
+
+interface AllHistoryResponse {
+  success: true;
+  total_logs: number;
+  logs: Array<{
+    id_rekonsiliasi: string;
+    id_cabang: string;
+    nama_cabang: string;
+    tanggal: string;
+    kas_digital: number;
+    kas_fisik: number;
+    selisih: number;
+    status: string;
+    approval_status: string;
+    catatan?: string;
+    catatan_owner?: string;
+  }>;
+}
+
+router.get(
+  '/reconcile/all',
+  (_req: Request, res: Response<AllHistoryResponse>) => {
+    const logs = getAllReconciliations();
+
+    res.status(200).json({
+      success: true,
+      total_logs: logs.length,
+      logs: logs.map((log) => {
+        const branch = getBranchById(log.id_cabang);
+        return {
+          id_rekonsiliasi: log.id_rekonsiliasi,
+          id_cabang: log.id_cabang,
+          nama_cabang: branch?.nama_cabang ?? log.id_cabang,
+          tanggal: log.tanggal.toISOString(),
+          kas_digital: log.kas_digital,
+          kas_fisik: log.kas_fisik,
+          selisih: log.selisih,
+          status: log.status,
+          approval_status: log.approval_status,
+          catatan: log.catatan,
+          catatan_owner: log.catatan_owner,
+        };
+      }),
+    });
+  },
+);
+
+interface ApproveBody {
+  catatan_owner?: string;
+}
+
+interface ApproveSuccessResponse {
+  success: true;
+  id_rekonsiliasi: string;
+  approval_status: string;
+  message: string;
+}
+
+router.patch(
+  '/reconcile/:id/approve',
+  (req: Request<{ id: string }, ApproveSuccessResponse | ReconcileErrorResponse, ApproveBody>, res: Response<ApproveSuccessResponse | ReconcileErrorResponse>) => {
+    const { id } = req.params;
+    const { catatan_owner } = req.body;
+
+    const log = approveReconciliation(id, catatan_owner);
+    if (!log) {
+      res.status(400).json({
+        success: false,
+        error: 'Rekonsiliasi tidak ditemukan atau sudah diproses.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      approval_status: log.approval_status,
+      message: 'Rekonsiliasi telah disetujui.',
+    });
+  },
+);
+
+router.patch(
+  '/reconcile/:id/reject',
+  (req: Request<{ id: string }, ApproveSuccessResponse | ReconcileErrorResponse, ApproveBody>, res: Response<ApproveSuccessResponse | ReconcileErrorResponse>) => {
+    const { id } = req.params;
+    const { catatan_owner } = req.body;
+
+    const log = rejectReconciliation(id, catatan_owner);
+    if (!log) {
+      res.status(400).json({
+        success: false,
+        error: 'Rekonsiliasi tidak ditemukan atau sudah diproses.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      approval_status: log.approval_status,
+      message: 'Rekonsiliasi telah ditolak.',
+    });
+  },
+);
+
+interface OverrideBody {
+  kas_fisik: number;
+  catatan_owner?: string;
+}
+
+interface OverrideSuccessResponse {
+  success: true;
+  id_rekonsiliasi: string;
+  kas_digital: number;
+  kas_fisik: number;
+  selisih: number;
+  status: string;
+  approval_status: string;
+  message: string;
+}
+
+router.patch(
+  '/reconcile/:id/override',
+  (req: Request<{ id: string }, OverrideSuccessResponse | ReconcileErrorResponse, OverrideBody>, res: Response<OverrideSuccessResponse | ReconcileErrorResponse>) => {
+    const { id } = req.params;
+    const { kas_fisik, catatan_owner } = req.body;
+
+    if (typeof kas_fisik !== 'number' || kas_fisik < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'kas_fisik harus berupa angka non-negatif.',
+      });
+      return;
+    }
+
+    const log = overrideReconciliation(id, kas_fisik, catatan_owner);
+    if (!log) {
+      res.status(404).json({
+        success: false,
+        error: 'Rekonsiliasi tidak ditemukan.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      kas_digital: log.kas_digital,
+      kas_fisik: log.kas_fisik,
+      selisih: log.selisih,
+      status: log.status,
+      approval_status: log.approval_status,
+      message: 'Data rekonsiliasi telah di-override oleh Owner.',
     });
   },
 );
@@ -157,6 +328,7 @@ interface RestockSuccessResponse {
     item: string;
     stok_saat_ini: number;
     safety_threshold: number;
+    max_capacity: number;
     status: string;
   }>;
   message: string;
@@ -201,6 +373,7 @@ router.post(
         item: s.item,
         stok_saat_ini: s.stok_saat_ini,
         safety_threshold: s.safety_threshold,
+        max_capacity: s.max_capacity,
         status: s.status,
       })),
       message: `Stok gudang cabang ${branch.nama_cabang} berhasil diisi ulang!`,
@@ -216,6 +389,7 @@ interface InventoryResponse {
     satuan: string;
     stok_saat_ini: number;
     safety_threshold: number;
+    max_capacity: number;
     status: string;
   }>;
 }
@@ -242,6 +416,7 @@ router.get(
         satuan: s.satuan,
         stok_saat_ini: s.stok_saat_ini,
         safety_threshold: s.safety_threshold,
+        max_capacity: s.max_capacity,
         status: s.status,
       })),
     });

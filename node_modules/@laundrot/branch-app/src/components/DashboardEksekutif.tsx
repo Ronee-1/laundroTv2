@@ -8,7 +8,25 @@ interface StockEntry {
   satuan: string;
   stok_saat_ini: number;
   safety_threshold: number;
+  max_capacity: number;
   status: 'Aman' | 'Menipis' | 'Habis';
+}
+
+interface InTransitData {
+  id: string;
+  sentItems: { detergen: number; pelembut: number; plastik: number };
+  status: string;
+  timestamp: string;
+}
+
+interface ReplenishmentItem {
+  item: string;
+  satuan: string;
+  stok_saat_ini: number;
+  max_capacity: number;
+  safety_threshold: number;
+  kebutuhan: number;
+  is_below_threshold: boolean;
 }
 
 interface BranchFinancial {
@@ -29,6 +47,8 @@ interface BranchFinancial {
   transaction_count: number;
   map_coordinates: { latitude: number; longitude: number; pin_color: 'green' | 'yellow' | 'red' };
   inventory: { stocks: StockEntry[]; overall_status: 'Aman' | 'Menipis' | 'Habis' };
+  in_transit: InTransitData[];
+  replenishment: { needs_replenishment: boolean; items: ReplenishmentItem[] };
 }
 
 interface DashboardData {
@@ -87,6 +107,36 @@ export function DashboardEksekutif({ userRole, selectedAdminBranch, triggerNotif
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [restockBranchId, setRestockBranchId] = useState('CBG-002');
+  const [shippingLogistics, setShippingLogistics] = useState(false);
+
+  async function handleApproveLogistics(branchId: string, items: ReplenishmentItem[]) {
+    setShippingLogistics(true);
+    try {
+      const sentItems = {
+        detergen: items.find((i) => i.item === 'Detergen')?.kebutuhan ?? 0,
+        pelembut: items.find((i) => i.item === 'Pelembut')?.kebutuhan ?? 0,
+        plastik: items.find((i) => i.item === 'Plastik')?.kebutuhan ?? 0,
+      };
+      const res = await fetch('/api/logistics/ship', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branchId, sentItems }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        triggerNotification(json.message, 'success');
+        const dashRes = await fetch('/api/owner/dashboard');
+        const dashJson = (await dashRes.json()) as DashboardData;
+        if (dashRes.ok && dashJson.success) setData(dashJson);
+      } else {
+        triggerNotification(json.error ?? 'Gagal mengirim logistik.', 'error');
+      }
+    } catch {
+      triggerNotification('Tidak dapat terhubung ke server.', 'error');
+    } finally {
+      setShippingLogistics(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -375,6 +425,56 @@ export function DashboardEksekutif({ userRole, selectedAdminBranch, triggerNotif
                   })}
                 </div>
               </div>
+
+              {selectedBranchData.in_transit.length > 0 && (
+                <div className="bg-[#EFF6FF] border border-blue-200/60 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🚚</span>
+                    <span className="text-xs font-bold text-[#1E3A8A]">Logistik Aktif</span>
+                  </div>
+                  {selectedBranchData.in_transit.map((t) => (
+                    <div key={t.id} className="text-[10px] text-blue-700 space-y-0.5">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold">{t.id} — {new Date(t.timestamp).toLocaleDateString('id-ID')}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${
+                          t.status === 'Driver-En-Route' ? 'bg-[#F5F3FF] text-[#6D28D9]' :
+                          t.status === 'Awaiting-Verification' ? 'bg-[#FFFBEB] text-[#B45309]' :
+                          'bg-blue-100 text-[#1E3A8A]'
+                        }`}>
+                          {t.status === 'Driver-En-Route' ? 'Kurir Sedang Menuju Lokasi' :
+                           t.status === 'Awaiting-Verification' ? 'Menunggu Verifikasi Admin' :
+                           'In-Transit'}
+                        </span>
+                      </div>
+                      <p>Detergen: {t.sentItems.detergen}L · Pelembut: {t.sentItems.pelembut}L · Plastik: {t.sentItems.plastik}pcs</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedBranchData.replenishment.needs_replenishment && selectedBranchData.in_transit.length === 0 && userRole === 'Owner' && (
+                <div className="bg-[#FFFBEB] border border-amber-200/60 rounded-2xl p-5 space-y-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-[#B45309] uppercase tracking-wider">Rekomendasi Pengadaan Otomatis</span>
+                    <p className="text-[10px] text-amber-700/80 mt-1">Formula: maxCapacity − Stok Saat Ini</p>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedBranchData.replenishment.items.filter((i) => i.is_below_threshold).map((item) => (
+                      <div key={item.item} className="flex justify-between items-center text-xs bg-white/70 rounded-lg px-3 py-2">
+                        <span className="text-slate-600 font-medium">{item.item}</span>
+                        <span className="font-bold text-[#0F172A]">{item.kebutuhan} {item.satuan}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => handleApproveLogistics(selectedBranchData.id_cabang, selectedBranchData.replenishment.items)}
+                    disabled={shippingLogistics}
+                    className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white text-xs font-semibold py-2.5 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {shippingLogistics ? 'Memproses...' : 'Setujui & Kirim Logistik'}
+                  </button>
+                </div>
+              )}
 
               <div className="flex gap-2.5 pt-2">
                 <button

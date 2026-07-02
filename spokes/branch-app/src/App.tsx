@@ -5,9 +5,10 @@ import { DashboardEksekutif } from './components/DashboardEksekutif.tsx';
 import { ExpenseForm } from './components/ExpenseForm.tsx';
 import { AuditRekonsiliasi } from './components/AuditRekonsiliasi.tsx';
 import { InventarisPemantau } from './components/InventarisPemantau.tsx';
+import { DashboardKurir } from './components/DashboardKurir.tsx';
 
-export type Page = 'tugas' | 'dashboard' | 'expense' | 'audit' | 'inventaris';
-export type UserRole = 'Owner' | 'Admin Cabang';
+export type Page = 'tugas' | 'dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir';
+export type UserRole = 'Owner' | 'Admin Cabang' | 'Kurir Logistik';
 
 export interface Notification {
   message: string;
@@ -110,6 +111,20 @@ function App() {
           >
             Admin Cabang
           </button>
+          <button
+            onClick={() => {
+              setUserRole('Kurir Logistik');
+              setPage('kurir');
+              triggerNotification('Mode Kurir Logistik. Akses dashboard pengiriman.', 'success');
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+              userRole === 'Kurir Logistik'
+                ? 'bg-[#0F172A] text-white shadow-soft'
+                : 'text-slate-600 hover:bg-white hover:shadow-soft'
+            }`}
+          >
+            Kurir Logistik
+          </button>
 
           {userRole === 'Admin Cabang' && (
             <div className="flex items-center gap-2 border-l border-slate-300 pl-3 ml-1">
@@ -163,6 +178,11 @@ function App() {
             <InventarisPemantau
               userRole={userRole}
               selectedAdminBranch={selectedAdminBranch}
+              triggerNotification={triggerNotification}
+            />
+          )}
+          {page === 'kurir' && (
+            <DashboardKurir
               triggerNotification={triggerNotification}
             />
           )}

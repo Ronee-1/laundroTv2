@@ -8,6 +8,7 @@ import {
 } from '../services/expense.js';
 import { getBudget } from '../services/budget.js';
 import { getInventoryByBranch, getInventoryStatus, type StockEntry } from '../services/inventory.js';
+import { getActiveShipmentsByBranch, getReplenishmentRecommendation } from '../services/logistics.js';
 
 const router = Router();
 
@@ -32,6 +33,26 @@ interface InventoryData {
   overall_status: 'Aman' | 'Menipis' | 'Habis';
 }
 
+interface InTransitData {
+  id: string;
+  sentItems: { detergen: number; pelembut: number; plastik: number };
+  status: string;
+  timestamp: string;
+}
+
+interface ReplenishmentData {
+  needs_replenishment: boolean;
+  items: Array<{
+    item: string;
+    satuan: string;
+    stok_saat_ini: number;
+    max_capacity: number;
+    safety_threshold: number;
+    kebutuhan: number;
+    is_below_threshold: boolean;
+  }>;
+}
+
 interface BranchFinancial {
   id_cabang: string;
   nama_cabang: string;
@@ -50,6 +71,8 @@ interface BranchFinancial {
   transaction_count: number;
   map_coordinates: MapCoordinates;
   inventory: InventoryData;
+  in_transit: InTransitData[];
+  replenishment: ReplenishmentData;
 }
 
 interface DashboardResponse {
@@ -141,6 +164,9 @@ router.get('/dashboard', (_req: Request, res: Response<DashboardResponse>) => {
     const pin_color = determineMapPinColor(rounded_utilization, inventoryStatus);
     const health_status = determineHealthStatus(rounded_utilization, inventoryStatus);
 
+    const inTransitLogs = getActiveShipmentsByBranch(branch.id_cabang);
+    const replenishment = getReplenishmentRecommendation(branch.id_cabang);
+
     return {
       id_cabang: branch.id_cabang,
       nama_cabang: branch.nama_cabang,
@@ -165,6 +191,16 @@ router.get('/dashboard', (_req: Request, res: Response<DashboardResponse>) => {
       inventory: {
         stocks: inventoryData?.stocks ?? [],
         overall_status: inventoryStatus,
+      },
+      in_transit: inTransitLogs.map((l) => ({
+        id: l.id,
+        sentItems: l.sentItems,
+        status: l.status,
+        timestamp: l.timestamp.toISOString(),
+      })),
+      replenishment: {
+        needs_replenishment: replenishment.needs_replenishment,
+        items: replenishment.items,
       },
     };
   });

@@ -56,6 +56,7 @@ router.post('/:id_cabang/reconcile', (req, res) => {
         kas_fisik: log.kas_fisik,
         selisih: log.selisih,
         status: log.status,
+        approval_status: log.approval_status,
         message: statusMessage,
     });
 });
@@ -81,8 +82,98 @@ router.get('/:id_cabang/reconcile/history', (req, res) => {
             kas_fisik: log.kas_fisik,
             selisih: log.selisih,
             status: log.status,
+            approval_status: log.approval_status,
             catatan: log.catatan,
+            catatan_owner: log.catatan_owner,
         })),
+    });
+});
+router.get('/reconcile/all', (_req, res) => {
+    const logs = (0, reconciliation_js_1.getAllReconciliations)();
+    res.status(200).json({
+        success: true,
+        total_logs: logs.length,
+        logs: logs.map((log) => {
+            const branch = (0, branches_js_1.getBranchById)(log.id_cabang);
+            return {
+                id_rekonsiliasi: log.id_rekonsiliasi,
+                id_cabang: log.id_cabang,
+                nama_cabang: branch?.nama_cabang ?? log.id_cabang,
+                tanggal: log.tanggal.toISOString(),
+                kas_digital: log.kas_digital,
+                kas_fisik: log.kas_fisik,
+                selisih: log.selisih,
+                status: log.status,
+                approval_status: log.approval_status,
+                catatan: log.catatan,
+                catatan_owner: log.catatan_owner,
+            };
+        }),
+    });
+});
+router.patch('/reconcile/:id/approve', (req, res) => {
+    const { id } = req.params;
+    const { catatan_owner } = req.body;
+    const log = (0, reconciliation_js_1.approveReconciliation)(id, catatan_owner);
+    if (!log) {
+        res.status(400).json({
+            success: false,
+            error: 'Rekonsiliasi tidak ditemukan atau sudah diproses.',
+        });
+        return;
+    }
+    res.status(200).json({
+        success: true,
+        id_rekonsiliasi: log.id_rekonsiliasi,
+        approval_status: log.approval_status,
+        message: 'Rekonsiliasi telah disetujui.',
+    });
+});
+router.patch('/reconcile/:id/reject', (req, res) => {
+    const { id } = req.params;
+    const { catatan_owner } = req.body;
+    const log = (0, reconciliation_js_1.rejectReconciliation)(id, catatan_owner);
+    if (!log) {
+        res.status(400).json({
+            success: false,
+            error: 'Rekonsiliasi tidak ditemukan atau sudah diproses.',
+        });
+        return;
+    }
+    res.status(200).json({
+        success: true,
+        id_rekonsiliasi: log.id_rekonsiliasi,
+        approval_status: log.approval_status,
+        message: 'Rekonsiliasi telah ditolak.',
+    });
+});
+router.patch('/reconcile/:id/override', (req, res) => {
+    const { id } = req.params;
+    const { kas_fisik, catatan_owner } = req.body;
+    if (typeof kas_fisik !== 'number' || kas_fisik < 0) {
+        res.status(400).json({
+            success: false,
+            error: 'kas_fisik harus berupa angka non-negatif.',
+        });
+        return;
+    }
+    const log = (0, reconciliation_js_1.overrideReconciliation)(id, kas_fisik, catatan_owner);
+    if (!log) {
+        res.status(404).json({
+            success: false,
+            error: 'Rekonsiliasi tidak ditemukan.',
+        });
+        return;
+    }
+    res.status(200).json({
+        success: true,
+        id_rekonsiliasi: log.id_rekonsiliasi,
+        kas_digital: log.kas_digital,
+        kas_fisik: log.kas_fisik,
+        selisih: log.selisih,
+        status: log.status,
+        approval_status: log.approval_status,
+        message: 'Data rekonsiliasi telah di-override oleh Owner.',
     });
 });
 router.post('/:id_cabang/restock', (req, res) => {
@@ -116,6 +207,7 @@ router.post('/:id_cabang/restock', (req, res) => {
             item: s.item,
             stok_saat_ini: s.stok_saat_ini,
             safety_threshold: s.safety_threshold,
+            max_capacity: s.max_capacity,
             status: s.status,
         })),
         message: `Stok gudang cabang ${branch.nama_cabang} berhasil diisi ulang!`,
@@ -139,6 +231,7 @@ router.get('/:id_cabang/inventory', (req, res) => {
             satuan: s.satuan,
             stok_saat_ini: s.stok_saat_ini,
             safety_threshold: s.safety_threshold,
+            max_capacity: s.max_capacity,
             status: s.status,
         })),
     });

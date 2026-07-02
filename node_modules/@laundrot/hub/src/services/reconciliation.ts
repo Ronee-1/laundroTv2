@@ -1,3 +1,5 @@
+export type ApprovalStatus = 'Pending' | 'Disetujui' | 'Ditolak';
+
 export interface ReconciliationLog {
   id_rekonsiliasi: string;
   id_cabang: string;
@@ -6,7 +8,9 @@ export interface ReconciliationLog {
   kas_fisik: number;
   selisih: number;
   status: 'Cocok' | 'Selisih';
+  approval_status: ApprovalStatus;
   catatan?: string;
+  catatan_owner?: string;
   created_at: Date;
 }
 
@@ -27,6 +31,7 @@ export function createReconciliation(params: {
     kas_fisik: params.kas_fisik,
     selisih,
     status: selisih === 0 ? 'Cocok' : 'Selisih',
+    approval_status: 'Pending',
     catatan: params.catatan,
     created_at: new Date(),
   };
@@ -46,4 +51,39 @@ export function getAllReconciliations(): ReconciliationLog[] {
 export function getLatestReconciliation(id_cabang: string): ReconciliationLog | undefined {
   const logs = getReconciliationByBranch(id_cabang);
   return logs.length > 0 ? logs[logs.length - 1] : undefined;
+}
+
+export function getReconciliationById(id_rekonsiliasi: string): ReconciliationLog | undefined {
+  return RECONCILIATION_LOGS.find((log) => log.id_rekonsiliasi === id_rekonsiliasi);
+}
+
+export function approveReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null {
+  const log = getReconciliationById(id_rekonsiliasi);
+  if (!log || log.approval_status !== 'Pending') return null;
+  log.approval_status = 'Disetujui';
+  log.catatan_owner = catatan_owner;
+  return log;
+}
+
+export function rejectReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null {
+  const log = getReconciliationById(id_rekonsiliasi);
+  if (!log || log.approval_status !== 'Pending') return null;
+  log.approval_status = 'Ditolak';
+  log.catatan_owner = catatan_owner;
+  return log;
+}
+
+export function overrideReconciliation(
+  id_rekonsiliasi: string,
+  new_kas_fisik: number,
+  catatan_owner?: string,
+): ReconciliationLog | null {
+  const log = getReconciliationById(id_rekonsiliasi);
+  if (!log) return null;
+  log.kas_fisik = new_kas_fisik;
+  log.selisih = new_kas_fisik - log.kas_digital;
+  log.status = log.selisih === 0 ? 'Cocok' : 'Selisih';
+  log.approval_status = 'Pending';
+  log.catatan_owner = catatan_owner ?? log.catatan_owner;
+  return log;
 }

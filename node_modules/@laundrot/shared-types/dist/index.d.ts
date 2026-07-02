@@ -66,4 +66,19 @@ export interface CashBookEntry {
     tanggal_jurnal: Date;
     created_at: Date;
 }
+export interface StockCapacity {
+    detergen: number;
+    pelembut: number;
+    plastik: number;
+}
+export type LogisticsStatus = 'In-Transit' | 'Driver-En-Route' | 'Awaiting-Verification' | 'Completed' | 'Completed-Discrepancy';
+export interface LogisticsLog {
+    id: string;
+    branchId: string;
+    sentItems: StockCapacity;
+    receivedItems: StockCapacity | null;
+    discrepancy: StockCapacity | null;
+    status: LogisticsStatus;
+    timestamp: Date;
+}
 //# sourceMappingURL=index.d.ts.map
