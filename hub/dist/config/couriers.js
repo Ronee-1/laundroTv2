@@ -2,6 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.COURIERS = void 0;
 exports.getCourierById = getCourierById;
+exports.getCouriersByBranch = getCouriersByBranch;
+// ==========================================
+// COURIERS CONFIG - FR-LOG-02, FR-LOG-03 Integration
+// Branch admin assigns orders to couriers
+// Courier views tasks in mobile app (TugasHarian)
+// ==========================================
 exports.COURIERS = [
     {
         id_kurir: 'KUR-001',
@@ -51,5 +57,9 @@ exports.COURIERS = [
 ];
 function getCourierById(id_kurir) {
     return exports.COURIERS.find((c) => c.id_kurir === id_kurir);
+}
+// FR-LOG-02: Get all couriers for a specific branch
+function getCouriersByBranch(id_cabang) {
+    return exports.COURIERS.filter((c) => c.id_cabang === id_cabang);
 }
 //# sourceMappingURL=couriers.js.map

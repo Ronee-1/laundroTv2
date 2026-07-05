@@ -5,7 +5,10 @@ export type OrderStatus =
   | 'Dalam Pengiriman'
   | 'Selesai'
   | 'Lunas'
-  | 'Dibatalkan';
+  | 'Dibatalkan'
+  | 'On Route'
+  | 'Arrived'
+  | 'Done';
 
 export type TransactionType = 'Pemasukan' | 'Pengeluaran';
 
@@ -55,6 +58,13 @@ export interface Order {
   tanggal_selesai?: Date;
   created_at: Date;
   updated_at: Date;
+  // WhatsApp Order Hub fields (FR-LOG-01)
+  customer_name?: string;
+  customer_whatsapp?: string;
+  service_type?: string;
+  wilayah?: string;
+  google_maps_url?: string;
+  source?: 'whatsapp' | 'manual';
 }
 
 export interface Transaction {

@@ -8,13 +8,13 @@ interface StockEntry {
   stok_saat_ini: number;
   safety_threshold: number;
   max_capacity: number;
-  status: 'Aman' | 'Menipis' | 'Habis';
+  status: 'Aman' | 'Menipis' | 'Kritis';
 }
 
 interface BranchInventory {
   id_cabang: string;
   nama_cabang: string;
-  inventory: { stocks: StockEntry[]; overall_status: 'Aman' | 'Menipis' | 'Habis' };
+  inventory: { stocks: StockEntry[]; overall_status: 'Aman' | 'Menipis' | 'Kritis'; last_updated?: string };
 }
 
 interface DashboardData { success: boolean; per_cabang: BranchInventory[]; }
@@ -32,12 +32,20 @@ interface Props {
   triggerNotification: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }
 
-function statusStyle(status: string) {
-  if (status === 'Aman') return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', dot: 'bg-emerald-500' };
-  if (status === 'Menipis') return { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]', dot: 'bg-amber-500' };
-  return { bg: 'bg-[#FFF1F2]', text: 'text-[#BE123C]', dot: 'bg-rose-500' };
+function getStatusStyle(status: string) {
+  if (status === 'Aman') return { bg: 'bg-teal-50 text-teal border-teal-200', dot: 'bg-teal' };
+  if (status === 'Menipis') return { bg: 'bg-amber-50 text-amber-600 border-amber-200', dot: 'bg-amber-500' };
+  if (status === 'Kritis') return { bg: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' };
+  return { bg: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' };
 }
 
+// ==========================================
+// INVENTARIS PEMANTAU - FR-INV-01 Supporting Extension
+// Modul pengawasan inventaris dengan safety threshold otomatis
+// Permintaan stok bahan baku darurat dari cabang ke Outlet Utama
+// Mendukung: Indikator sukses selisih kas Rp0 (stok terkontrol = kas terkontrol)
+// Extends: FR-FIN-02 (permintaan stok darurat)
+// ==========================================
 export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotification }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +58,44 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
   const [verifySentItems, setVerifySentItems] = useState<{ detergen: number; pelembut: number; plastik: number }>({ detergen: 0, pelembut: 0, plastik: 0 });
   const [verifyForm, setVerifyForm] = useState({ detergen: '', pelembut: '', plastik: '' });
   const [verifying, setVerifying] = useState(false);
+
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustForm, setAdjustForm] = useState({ item: 'Detergen' as 'Detergen' | 'Pelembut' | 'Plastik', stok_baru: '', alasan: '' });
+  const [adjusting, setAdjusting] = useState(false);
+
+  async function handleAdjust() {
+    if (!adjustForm.stok_baru || !adjustForm.alasan) {
+      triggerNotification('Semua field wajib diisi.', 'error');
+      return;
+    }
+    setAdjusting(true);
+    try {
+      const res = await fetch(`/api/branches/${selectedAdminBranch}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: adjustForm.item,
+          stok_baru: parseInt(adjustForm.stok_baru, 10),
+          alasan: adjustForm.alasan,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        triggerNotification(json.message, 'success');
+        setShowAdjustModal(false);
+        setAdjustForm({ item: 'Detergen', stok_baru: '', alasan: '' });
+        const dashRes = await fetch('/api/owner/dashboard');
+        const dashJson = (await dashRes.json()) as DashboardData;
+        if (dashRes.ok && dashJson.success) setData(dashJson);
+      } else {
+        triggerNotification(json.error ?? 'Gagal menyesuaikan stok.', 'error');
+      }
+    } catch {
+      triggerNotification('Tidak dapat terhubung ke server.', 'error');
+    } finally {
+      setAdjusting(false);
+    }
+  }
 
   async function fetchLogistics(branchId: string) {
     try {
@@ -68,9 +114,9 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
         const res = await fetch('/api/owner/dashboard');
         const json = (await res.json()) as DashboardData;
         if (cancelled) return;
-        if (!res.ok || !json.success) { setError('Gagal memuat data inventaris.'); return; }
+        if (!res.ok || !json.success) { setError('Gagal memuat data.'); return; }
         setData(json);
-      } catch { if (!cancelled) setError('Tidak dapat terhubung ke server.'); } finally { if (!cancelled) setLoading(false); }
+      } catch { if (!cancelled) setError('Tidak dapat terhubung.'); } finally { if (!cancelled) setLoading(false); }
     }
     fetchInventory();
     return () => { cancelled = true; };
@@ -126,206 +172,267 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="text-center">
-          <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p className="text-slate-500 text-sm">Memuat data inventaris...</p>
-        </div>
+        <div className="w-10 h-10 border-2 border-slate-200 border-t-deep-blue rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="bg-[#FFF1F2] border border-[#BE123C]/10 rounded-2xl p-6 text-center">
-        <p className="text-[#BE123C] text-sm font-medium">{error ?? 'Gagal memuat data.'}</p>
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
+        <p className="text-red-600 text-sm font-medium">{error ?? 'Gagal memuat data.'}</p>
       </div>
     );
   }
 
   const filteredBranches = data.per_cabang.filter((b) => userRole === 'Owner' || b.id_cabang === selectedAdminBranch);
-  const habisCount = filteredBranches.filter((b) => b.inventory.overall_status === 'Habis').length;
+  const kritisCount = filteredBranches.filter((b) => b.inventory.overall_status === 'Kritis').length;
   const menipisCount = filteredBranches.filter((b) => b.inventory.overall_status === 'Menipis').length;
   const amanCount = filteredBranches.filter((b) => b.inventory.overall_status === 'Aman').length;
 
+  const isAnyStockCritical = filteredBranches.some(branch =>
+    branch.inventory.stocks.some(stock => {
+      if (stock.item === 'Detergen' && stock.stok_saat_ini < 50) return true;
+      if (stock.item === 'Pelembut' && stock.stok_saat_ini < 50) return true;
+      if (stock.item === 'Plastik' && stock.stok_saat_ini < 100) return true;
+      return false;
+    })
+  );
+
+  const showNoUpdateWarning = (() => {
+    if (userRole !== 'Admin Cabang') return false;
+    const branch = data.per_cabang.find((b) => b.id_cabang === selectedAdminBranch);
+    if (!branch || !branch.inventory.last_updated) return false;
+    const lastUpdateDate = new Date(branch.inventory.last_updated);
+    const diffMs = Date.now() - lastUpdateDate.getTime();
+    return diffMs > 24 * 60 * 60 * 1000;
+  })();
+
   return (
-    <div className="space-y-8 max-w-[1400px]">
+    <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#0F172A] tracking-tight">Gudang & Inventaris</h1>
-          <p className="text-slate-500 text-sm mt-1.5">Deteksi dini stok logistik bahan baku produksi laundry harian.</p>
+          <h1 className="text-2xl font-bold text-navy tracking-tight">Gudang & Inventaris</h1>
+          <p className="text-sm text-slate-500 mt-1">Deteksi dini stok logistik bahan baku</p>
         </div>
-        <button
-          onClick={() => { setRestockBranchId(userRole === 'Admin Cabang' ? selectedAdminBranch : 'CBG-002'); setShowRestockModal(true); }}
-          className="bg-[#0F172A] hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md"
-        >
-          + Restock Bahan Baku
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-5">
-        <div className="bg-white border border-slate-100 rounded-4xl p-6 text-center shadow-card">
-          <p className="text-3xl font-light text-[#047857] tracking-tight">{amanCount}</p>
-          <p className="text-xs text-slate-400 font-medium mt-1.5">Aman</p>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-4xl p-6 text-center shadow-card">
-          <p className="text-3xl font-light text-[#B45309] tracking-tight">{menipisCount}</p>
-          <p className="text-xs text-slate-400 font-medium mt-1.5">Menipis</p>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-4xl p-6 text-center shadow-card">
-          <p className="text-3xl font-light text-[#BE123C] tracking-tight">{habisCount}</p>
-          <p className="text-xs text-slate-400 font-medium mt-1.5">Habis</p>
+        <div className="flex items-center gap-3">
+          {userRole === 'Admin Cabang' && (
+            <button onClick={() => setShowAdjustModal(true)}
+              className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-2xl text-sm font-medium hover:bg-red-100 transition-all">
+              ⚠️ Penyesuaian Stok
+            </button>
+          )}
+          <button onClick={() => { setRestockBranchId(selectedAdminBranch); setShowRestockModal(true); }}
+            className="bg-deep-blue text-white px-4 py-2 rounded-2xl text-sm font-medium hover:bg-navy transition-all">
+            + Restock
+          </button>
         </div>
       </div>
 
+      {/* Alert Banners */}
+      {showNoUpdateWarning && (
+        <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl flex items-center gap-3">
+          <span className="text-base">⚠️</span>
+          <div>
+            <h4 className="text-sm font-semibold text-amber-600">Peringatan: Data Stok Belum Diperbarui</h4>
+            <p className="text-xs text-slate-500 mt-0.5">Cabang Anda belum memperbarui laporan stok fisik dalam 24 jam terakhir.</p>
+          </div>
+        </div>
+      )}
+
+      {isAnyStockCritical && (
+        <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-2xl flex items-center gap-3 animate-blink">
+          <span className="flex h-2.5 w-2.5 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+          </span>
+          <div>
+            <h4 className="text-sm font-bold text-red-600 uppercase tracking-wide">⚠️ Stok Kritis / Menipis</h4>
+            <p className="text-xs text-slate-500 mt-0.5">Beberapa persediaan di bawah batas pengaman minimum!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Status Summary Cards - Premium Design */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white border border-teal-200 rounded-2xl p-6 text-center">
+          <p className="text-3xl font-bold text-teal">{amanCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Aman</p>
+        </div>
+        <div className="bg-white border border-amber-200 rounded-2xl p-6 text-center">
+          <p className="text-3xl font-bold text-amber-600">{menipisCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Menipis</p>
+        </div>
+        <div className="bg-white border border-red-200 rounded-2xl p-6 text-center">
+          <p className="text-3xl font-bold text-red-600">{kritisCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Kritis</p>
+        </div>
+      </div>
+
+      {/* In-Transit Alert */}
       {inTransitLogs.length > 0 && (
-        <div className="bg-[#FFFBEB] border border-amber-200/60 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="text-lg">🚚</span>
-            <div>
-              <h4 className="text-sm font-bold text-[#B45309]">Logistik Dalam Perjalanan</h4>
-              <p className="text-xs text-amber-700/80 mt-0.5">Ada {inTransitLogs.length} pengiriman yang sedang diproses untuk cabang Anda.</p>
-            </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🚚</span>
+            <h4 className="text-sm font-bold text-amber-600">Logistik Dalam Perjalanan</h4>
           </div>
-          <div className="space-y-3">
-            {inTransitLogs.map((log) => {
-              const canVerify = log.status === 'Awaiting-Verification' || log.status === 'In-Transit';
-              return (
-                <div key={log.id} className="bg-white/70 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-[#0F172A]">{log.id}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${
-                        log.status === 'Driver-En-Route' ? 'bg-[#F5F3FF] text-[#6D28D9]' :
-                        log.status === 'Awaiting-Verification' ? 'bg-[#FFFBEB] text-[#B45309]' :
-                        'bg-blue-100 text-[#1E3A8A]'
-                      }`}>
-                        {log.status === 'Driver-En-Route' ? 'Kurir Menuju Lokasi' :
-                         log.status === 'Awaiting-Verification' ? 'Siap Verifikasi' :
-                         'In-Transit'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Dikirim: {log.sentItems.detergen}L Detergen · {log.sentItems.pelembut}L Pelembut · {log.sentItems.plastik}pcs Plastik
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{new Date(log.timestamp).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                  </div>
-                  {canVerify && (
-                    <button
-                      onClick={() => openVerifyForm(log)}
-                      className="bg-[#B45309] hover:bg-[#92400E] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md whitespace-nowrap"
-                    >
-                      Verifikasi Barang
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {showVerifyForm && verifyLogId && (
-        <div className="fixed inset-0 bg-[#0F172A]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-4xl max-w-md w-full overflow-hidden shadow-elevated">
-            <div className="p-7 pb-5 border-b border-slate-100">
-              <div className="flex justify-between items-start">
+          {inTransitLogs.map((log) => {
+            const canVerify = log.status === 'Awaiting-Verification' || log.status === 'In-Transit';
+            return (
+              <div key={log.id} className="bg-white/70 rounded-2xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
-                  <h3 className="text-lg font-bold text-[#0F172A]">Audit Verifikasi Penerimaan</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{verifyLogId} — Masukkan jumlah fisik yang benar-benar diterima</p>
+                  <p className="text-xs font-bold text-navy">{log.id}</p>
+                  <p className="text-[10px] text-slate-500">{log.sentItems.detergen} Det · {log.sentItems.pelembut} Pel · {log.sentItems.plastik} Plas</p>
                 </div>
-                <button onClick={() => { setShowVerifyForm(false); setVerifyLogId(null); }} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                {canVerify && (
+                  <button onClick={() => openVerifyForm(log)}
+                    className="bg-deep-blue hover:bg-navy text-white text-xs font-medium px-3 py-1.5 rounded-xl transition-all whitespace-nowrap">
+                    Verifikasi
+                  </button>
+                )}
               </div>
-            </div>
-            <div className="p-7 space-y-5">
-              <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-xs">
-                <span className="font-semibold text-slate-500 block mb-2">Jumlah yang Dikirim Pusat (Referensi)</span>
-                <div className="flex justify-between"><span className="text-slate-500">Detergen</span><span className="font-semibold text-[#0F172A]">{verifySentItems.detergen} L</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Pelembut</span><span className="font-semibold text-[#0F172A]">{verifySentItems.pelembut} L</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Plastik</span><span className="font-semibold text-[#0F172A]">{verifySentItems.plastik} pcs</span></div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Detergen Diterima (Liter)</label>
-                <input type="number" placeholder="Jumlah fisik sebenarnya" value={verifyForm.detergen} onChange={(e) => setVerifyForm({ ...verifyForm, detergen: e.target.value })} className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Pelembut Diterima (Liter)</label>
-                <input type="number" placeholder="Jumlah fisik sebenarnya" value={verifyForm.pelembut} onChange={(e) => setVerifyForm({ ...verifyForm, pelembut: e.target.value })} className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Plastik Diterima (Pcs)</label>
-                <input type="number" placeholder="Jumlah fisik sebenarnya" value={verifyForm.plastik} onChange={(e) => setVerifyForm({ ...verifyForm, plastik: e.target.value })} className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all" />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowVerifyForm(false); setVerifyLogId(null); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold py-3 rounded-xl transition-all">Batal</button>
-                <button onClick={handleVerify} disabled={verifying} className="flex-1 bg-[#1E3A8A] hover:bg-[#1E40AF] text-white text-sm font-semibold py-3 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50">{verifying ? 'Memverifikasi...' : 'Simpan Verifikasi'}</button>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Branch Inventory Grid - Premium Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredBranches.map((branch) => {
-          const s = statusStyle(branch.inventory.overall_status);
+          const s = getStatusStyle(branch.inventory.overall_status);
           return (
-            <div key={branch.id_cabang} className="bg-white p-7 rounded-4xl border border-slate-100 shadow-card hover:shadow-card-hover transition-shadow duration-300">
-              <div className="flex justify-between items-center pb-4 mb-5 border-b border-slate-100">
+            <div key={branch.id_cabang} className="bg-white border border-slate-200 rounded-2xl p-6">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
                 <div>
-                  <h4 className="font-bold text-[#0F172A] text-base">{branch.nama_cabang}</h4>
+                  <h4 className="font-semibold text-navy">{branch.nama_cabang}</h4>
                   <span className="text-xs text-slate-400">{branch.id_cabang}</span>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold ${s.bg} ${s.text}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.bg}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`}></span>
                   {branch.inventory.overall_status}
                 </span>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-3 mt-4">
                 {branch.inventory.stocks.map((stock) => {
-                  const isLow = stock.stok_saat_ini < stock.safety_threshold;
-                  const maxRef = stock.max_capacity ?? (stock.item === 'Detergen' ? 100 : stock.item === 'Pelembut' ? 80 : 200);
-                  const pct = Math.min((stock.stok_saat_ini / maxRef) * 100, 100);
-                  const label = stock.item === 'Detergen' ? 'Detergen Cair (Konsentrat)' : stock.item === 'Pelembut' ? 'Pelembut & Pewangi' : 'Plastik Packing';
+                  const isLow = stock.status === 'Kritis' || stock.status === 'Menipis';
+                  const pct = Math.min((stock.stok_saat_ini / stock.max_capacity) * 100, 100);
+                  const label = stock.item === 'Detergen' ? 'Detergen' : stock.item === 'Pelembut' ? 'Pelembut' : 'Plastik';
 
                   return (
-                    <div key={stock.item} className="space-y-2">
+                    <div key={stock.item} className="space-y-1">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-500 font-medium">{label}</span>
-                        <span className={`font-semibold ${isLow ? 'text-[#BE123C]' : 'text-[#0F172A]'}`}>
-                          {stock.stok_saat_ini} {stock.satuan} <span className="text-slate-400 font-normal">/ min {stock.safety_threshold}</span>
+                        <span className={`font-semibold ${isLow ? 'text-red-600' : 'text-navy'}`}>
+                          {stock.stok_saat_ini} <span className="text-slate-400 font-normal">/ min {stock.safety_threshold}</span>
                         </span>
                       </div>
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div style={{ width: `${pct}%` }} className={`h-full rounded-full transition-all duration-500 ${isLow ? 'bg-[#BE123C]' : 'bg-blue-500'}`}></div>
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div style={{ width: `${pct}%` }} className={`h-full rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-deep-blue'}`}></div>
                       </div>
                       {isLow && (
-                        <span className="text-[10px] text-[#BE123C] font-semibold block">Stok di bawah batas pengaman. Butuh restock segera.</span>
+                        <span className="text-[10px] text-red-600 font-semibold animate-blink">
+                          ⚠️ {stock.status === 'Kritis' ? 'Stok Kritis' : 'Stok Menipis'}
+                        </span>
                       )}
                     </div>
                   );
                 })}
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                <button
-                  onClick={() => { setRestockBranchId(branch.id_cabang); setShowRestockModal(true); }}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-semibold text-xs px-4 py-2 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  Restock Cabang
-                </button>
               </div>
             </div>
           );
         })}
       </div>
 
+      {/* Verify Modal */}
+      {showVerifyForm && verifyLogId && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-sm w-full">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start">
+              <div>
+                <h3 className="text-base font-bold text-navy">Verifikasi Penerimaan</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{verifyLogId}</p>
+              </div>
+              <button onClick={() => { setShowVerifyForm(false); setVerifyLogId(null); }} className="text-slate-400 hover:text-navy">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-base-bg rounded-2xl p-3 text-xs space-y-1">
+                <span className="font-semibold text-slate-500 block">Dikirim:</span>
+                <div className="flex justify-between"><span className="text-slate-500">Detergen</span><span className="font-medium text-navy">{verifySentItems.detergen} pcs</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Pelembut</span><span className="font-medium text-navy">{verifySentItems.pelembut} pcs</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Plastik</span><span className="font-medium text-navy">{verifySentItems.plastik} pcs</span></div>
+              </div>
+              {(['detergen', 'pelembut', 'plastik'] as const).map((item) => (
+                <div key={item}>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">{item.charAt(0).toUpperCase() + item.slice(1)} (pcs)</label>
+                  <input type="number" value={verifyForm[item]} onChange={(e) => setVerifyForm({ ...verifyForm, [item]: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all" />
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <button onClick={() => { setShowVerifyForm(false); setVerifyLogId(null); }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-2xl transition-all">Batal</button>
+                <button onClick={handleVerify} disabled={verifying}
+                  className="flex-1 bg-deep-blue hover:bg-navy text-white text-sm font-medium py-2.5 rounded-2xl transition-all disabled:opacity-50">
+                  {verifying ? 'Memproses...' : 'Simpan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment Modal - Sends to Owner Anomaly Log */}
+      {showAdjustModal && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-sm w-full">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start">
+              <div>
+                <h3 className="text-base font-bold text-red-600">⚠️ Penyesuaian Stok</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Aksi akan dicatat ke Log Anomali Operasional</p>
+              </div>
+              <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-navy">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Bahan Baku</label>
+                <select value={adjustForm.item} onChange={(e) => setAdjustForm({ ...adjustForm, item: e.target.value as any })}
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all">
+                  <option value="Detergen">Detergen</option>
+                  <option value="Pelembut">Pelembut</option>
+                  <option value="Plastik">Plastik Packing</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Jumlah Baru (pcs)</label>
+                <input type="number" value={adjustForm.stok_baru} onChange={(e) => setAdjustForm({ ...adjustForm, stok_baru: e.target.value })}
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Alasan</label>
+                <textarea rows={2} value={adjustForm.alasan} onChange={(e) => setAdjustForm({ ...adjustForm, alasan: e.target.value })}
+                  placeholder="Contoh: Salah input / Botol bocor"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy placeholder:text-slate-400 focus:outline-none focus:border-deep-blue transition-all resize-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowAdjustModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-2xl transition-all">Batal</button>
+                <button onClick={handleAdjust} disabled={adjusting}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2.5 rounded-2xl transition-all disabled:opacity-50">
+                  {adjusting ? 'Menyimpan...' : '⚠️ Simpan & Log'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restock Modal */}
       {showRestockModal && (
         <RestockModal
           branches={data.per_cabang.map((b) => ({ id: b.id_cabang, nama: b.nama_cabang }))}

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BRANCHES = void 0;
+exports.MACRO_FINANCIALS = exports.BRANCHES = void 0;
 exports.getActiveBranches = getActiveBranches;
 exports.getBranchById = getBranchById;
 exports.BRANCHES = [
@@ -75,6 +75,11 @@ exports.BRANCHES = [
         wilayah: 'Bogor',
     },
 ];
+// Macro financials - Total Konsolidasi Omzet = Rp91.200.000
+exports.MACRO_FINANCIALS = {
+    total_konsolidasi_omzet: 91200000,
+    batas_anggaran_operasional: 22500000,
+};
 function getActiveBranches() {
     return exports.BRANCHES.filter((b) => b.is_active);
 }

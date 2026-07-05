@@ -236,5 +236,67 @@ router.get('/:id_cabang/inventory', (req, res) => {
         })),
     });
 });
+router.post('/:id_cabang/adjust', (req, res) => {
+    const { id_cabang } = req.params;
+    const { item, stok_baru, alasan } = req.body;
+    if (!item || typeof stok_baru !== 'number' || stok_baru < 0 || !alasan) {
+        res.status(400).json({
+            success: false,
+            error: 'Data tidak lengkap atau tidak valid.',
+        });
+        return;
+    }
+    const updated = (0, inventory_js_1.adjustInventory)(id_cabang, {
+        item,
+        stok_baru,
+        alasan,
+    });
+    if (!updated) {
+        res.status(404).json({
+            success: false,
+            error: 'Data inventaris cabang tidak ditemukan.',
+        });
+        return;
+    }
+    res.status(200).json({
+        success: true,
+        message: 'Penyesuaian stok berhasil disimpan dan dicatat sebagai anomali.',
+    });
+});
+const CUSTOMERS = [];
+let nextCustomerId = 1;
+router.post('/:id_cabang/customer', (req, res) => {
+    const { id_cabang } = req.params;
+    const { nama, whatsapp, alamat_maps } = req.body;
+    if (!nama || !whatsapp || !alamat_maps) {
+        res.status(400).json({
+            success: false,
+            error: 'Semua data wajib diisi.',
+        });
+        return;
+    }
+    if (!alamat_maps.includes('google.com/maps') &&
+        !alamat_maps.includes('maps.google.com') &&
+        !alamat_maps.includes('maps.app.goo.gl')) {
+        res.status(400).json({
+            success: false,
+            error: 'Wajib memasukkan Link Google Maps',
+        });
+        return;
+    }
+    const newCustomer = {
+        id_pelanggan: `PLG-${String(nextCustomerId++).padStart(3, '0')}`,
+        id_cabang,
+        nama,
+        whatsapp,
+        alamat_maps,
+    };
+    CUSTOMERS.push(newCustomer);
+    res.status(201).json({
+        success: true,
+        message: `Data pelanggan ${nama} berhasil disimpan mandiri di cabang ${id_cabang}.`,
+        customer: newCustomer,
+    });
+});
 exports.default = router;
 //# sourceMappingURL=branches.js.map

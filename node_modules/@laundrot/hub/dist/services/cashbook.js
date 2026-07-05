@@ -4,6 +4,12 @@ exports.createJournalEntry = createJournalEntry;
 exports.getJournalByBranch = getJournalByBranch;
 exports.getAllJournalEntries = getAllJournalEntries;
 exports.getJournalSummary = getJournalSummary;
+// ==========================================
+// CASHBOOK SERVICE - FR-FIN-01 Core Implementation
+// Jurnal transaksi otomatis ke Outlet Utama dengan tag cabang asal
+// Seluruh transaksi dari 5 cabang masuk ke database jurnal tunggal
+// Mendukung: FR-FIN-02 (approval), FR-OWN-01 (dashboard)
+// ==========================================
 const CASH_BOOK = [];
 function createJournalEntry(params) {
     const entry = {

@@ -1,5 +1,11 @@
 import type { Courier, Order } from '@laundrot/shared-types';
 
+// ==========================================
+// COURIERS CONFIG - FR-LOG-02, FR-LOG-03 Integration
+// Branch admin assigns orders to couriers
+// Courier views tasks in mobile app (TugasHarian)
+// ==========================================
+
 export const COURIERS: Courier[] = [
   {
     id_kurir: 'KUR-001',
@@ -50,4 +56,9 @@ export const COURIERS: Courier[] = [
 
 export function getCourierById(id_kurir: string): Courier | undefined {
   return COURIERS.find((c) => c.id_kurir === id_kurir);
+}
+
+// FR-LOG-02: Get all couriers for a specific branch
+export function getCouriersByBranch(id_cabang: string): Courier[] {
+  return COURIERS.filter((c) => c.id_cabang === id_cabang);
 }

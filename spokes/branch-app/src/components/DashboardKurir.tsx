@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  isOnline,
-  getLogisticsQueue,
-  addToLogisticsQueue,
-  syncLogisticsQueue,
-  type QueuedLogisticsAction,
-} from '../utils/offlineQueue.ts';
+import { isOnline, getLogisticsQueue, addToLogisticsQueue, syncLogisticsQueue, type QueuedLogisticsAction } from '../utils/offlineQueue.ts';
 
 interface CourierTask {
   id_order: string;
@@ -34,37 +28,36 @@ interface Props {
 type TabKey = 'pelanggan' | 'operasional';
 
 const NEXT_STATUS: Record<string, string> = {
-  Pending: 'Diproses',
-  Diproses: 'Siap Diantar',
-  'Siap Diantar': 'Dalam Pengiriman',
-  'Dalam Pengiriman': 'Selesai',
-  Selesai: 'Lunas',
+  Pending: 'On Route',
+  'On Route': 'Arrived',
+  Arrived: 'Done',
 };
 
 function statusBadge(status: string): { bg: string; text: string } {
   switch (status) {
-    case 'Pending': return { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]' };
-    case 'Diproses': return { bg: 'bg-[#EFF6FF]', text: 'text-[#1E3A8A]' };
-    case 'Siap Diantar': return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]' };
-    case 'Dalam Pengiriman': return { bg: 'bg-[#F5F3FF]', text: 'text-[#6D28D9]' };
-    case 'Selesai': return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]' };
-    case 'Lunas': return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]' };
-    case 'In-Transit': return { bg: 'bg-[#EFF6FF]', text: 'text-[#1E3A8A]' };
-    case 'Driver-En-Route': return { bg: 'bg-[#F5F3FF]', text: 'text-[#6D28D9]' };
-    case 'Awaiting-Verification': return { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]' };
-    default: return { bg: 'bg-slate-100', text: 'text-slate-600' };
+    case 'Pending': return { bg: 'bg-amber-50 text-amber-600 border-amber-200', text: 'bg-amber-500' };
+    case 'On Route': return { bg: 'bg-blue-50 text-blue-600 border-blue-200', text: 'bg-blue-500' };
+    case 'Arrived': return { bg: 'bg-teal-50 text-teal border-teal-200', text: 'bg-teal' };
+    case 'Done': return { bg: 'bg-teal-50 text-teal border-teal-200', text: 'bg-teal' };
+    case 'In-Transit': return { bg: 'bg-blue-50 text-blue-600 border-blue-200', text: 'bg-blue-500' };
+    case 'Driver-En-Route': return { bg: 'bg-blue-50 text-blue-600 border-blue-200', text: 'bg-blue-500' };
+    case 'Awaiting-Verification': return { bg: 'bg-amber-50 text-amber-600 border-amber-200', text: 'bg-amber-500' };
+    default: return { bg: 'bg-slate-100 text-slate-600 border-slate-200', text: 'bg-slate-500' };
   }
 }
 
 function logisticsStatusLabel(status: string): string {
   switch (status) {
-    case 'In-Transit': return 'Menunggu Kurir';
-    case 'Driver-En-Route': return 'Kurir Sedang Menuju Lokasi';
-    case 'Awaiting-Verification': return 'Menunggu Verifikasi Admin';
+    case 'In-Transit': return 'Menunggu';
+    case 'Driver-En-Route': return 'Menuju';
+    case 'Awaiting-Verification': return 'Verifikasi';
     default: return status;
   }
 }
 
+// ==========================================
+// DASHBOARD KURIR - Premium Flat Design
+// ==========================================
 export function DashboardKurir({ triggerNotification }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('pelanggan');
   const [online, setOnline] = useState(isOnline());
@@ -88,7 +81,7 @@ export function DashboardKurir({ triggerNotification }: Props) {
       const result = await syncLogisticsQueue();
       refreshLogisticsQueue();
       if (result.synced > 0) {
-        triggerNotification(`${result.synced} aksi logistik berhasil disinkronkan.`, 'success');
+        triggerNotification(`${result.synced} aksi berhasil disinkronkan.`, 'success');
         fetchLogistics();
       }
     } finally { setSyncing(false); }
@@ -137,7 +130,7 @@ export function DashboardKurir({ triggerNotification }: Props) {
 
   function handleCustomerStatusChange(id_order: string, new_status: string) {
     if (!isOnline()) {
-      triggerNotification('Offline — perubahan status akan disinkronkan saat koneksi pulih.', 'warning');
+      triggerNotification('Offline — perubahan akan disinkronkan saat pulih.', 'warning');
       return;
     }
     setActionLoading(id_order);
@@ -155,7 +148,7 @@ export function DashboardKurir({ triggerNotification }: Props) {
           triggerNotification(json.error ?? 'Gagal mengubah status.', 'error');
         }
       })
-      .catch(() => triggerNotification('Tidak dapat terhubung ke server.', 'error'))
+      .catch(() => triggerNotification('Tidak dapat terhubung.', 'error'))
       .finally(() => setActionLoading(null));
   }
 
@@ -164,7 +157,7 @@ export function DashboardKurir({ triggerNotification }: Props) {
     if (!isOnline()) {
       addToLogisticsQueue({ logistics_id: logisticsId, action: 'start-route', original_timestamp });
       refreshLogisticsQueue();
-      triggerNotification('Tersimpan di antrean lokal (offline). Akan disinkronkan saat online.', 'warning');
+      triggerNotification('Tersimpan offline. Akan disinkronkan saat online.', 'warning');
       return;
     }
     setActionLoading(logisticsId);
@@ -175,10 +168,10 @@ export function DashboardKurir({ triggerNotification }: Props) {
           triggerNotification(json.message, 'success');
           fetchLogistics();
         } else {
-          triggerNotification(json.error ?? 'Gagal memulai perjalanan.', 'error');
+          triggerNotification(json.error ?? 'Gagal.', 'error');
         }
       })
-      .catch(() => triggerNotification('Tidak dapat terhubung ke server.', 'error'))
+      .catch(() => triggerNotification('Tidak dapat terhubung.', 'error'))
       .finally(() => setActionLoading(null));
   }
 
@@ -187,7 +180,7 @@ export function DashboardKurir({ triggerNotification }: Props) {
     if (!isOnline()) {
       addToLogisticsQueue({ logistics_id: logisticsId, action: 'handover', original_timestamp });
       refreshLogisticsQueue();
-      triggerNotification('Tersimpan di antrean lokal (offline). Akan disinkronkan saat online.', 'warning');
+      triggerNotification('Tersimpan offline. Akan disinkronkan saat online.', 'warning');
       return;
     }
     setActionLoading(logisticsId);
@@ -198,10 +191,10 @@ export function DashboardKurir({ triggerNotification }: Props) {
           triggerNotification(json.message, 'success');
           fetchLogistics();
         } else {
-          triggerNotification(json.error ?? 'Gagal serah terima.', 'error');
+          triggerNotification(json.error ?? 'Gagal.', 'error');
         }
       })
-      .catch(() => triggerNotification('Tidak dapat terhubung ke server.', 'error'))
+      .catch(() => triggerNotification('Tidak dapat terhubung.', 'error'))
       .finally(() => setActionLoading(null));
   }
 
@@ -210,75 +203,64 @@ export function DashboardKurir({ triggerNotification }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="text-center">
-          <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p className="text-slate-500 text-sm">Memuat dashboard kurir...</p>
-        </div>
+        <div className="w-10 h-10 border-2 border-slate-200 border-t-deep-blue rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-[900px]">
+    <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#0F172A] tracking-tight">Dashboard Kurir</h1>
-          <p className="text-slate-500 text-sm mt-1.5">Pusat kendali tugas pengiriman pelanggan dan logistik operasional.</p>
+          <h1 className="text-2xl font-bold text-navy tracking-tight">Dashboard Kurir</h1>
+          <p className="text-sm text-slate-500 mt-1">Pusat kendali tugas pelanggan & logistik</p>
         </div>
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${online ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#FFF1F2] text-[#BE123C]'}`}>
-          <span className={`w-2 h-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${online ? 'bg-teal-50 text-teal border border-teal-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+          <span className={`w-2 h-2 rounded-full ${online ? 'bg-teal' : 'bg-red-600'}`} />
           {online ? 'Online' : 'Offline'}
         </div>
       </div>
 
+      {/* Offline Queue Alert */}
       {pendingLogisticsQueue > 0 && (
-        <div className="bg-[#FFFBEB] border border-amber-200/60 rounded-2xl p-4 flex items-center gap-3">
+        <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl flex items-center gap-3">
           <span className="text-base">🔄</span>
-          <div>
-            <p className="text-xs font-bold text-[#B45309]">Tersimpan di Antrean Lokal (Offline)</p>
-            <p className="text-[10px] text-amber-700/80 mt-0.5">{pendingLogisticsQueue} aksi menunggu sinkronisasi. Akan otomatis terkirim saat koneksi pulih.</p>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-amber-600">{pendingLogisticsQueue} aksi menunggu sinkronisasi</p>
+            <p className="text-xs text-slate-500">Akan otomatis terkirim saat koneksi pulih</p>
           </div>
-          {syncing && (
-            <svg className="animate-spin h-4 w-4 text-[#B45309] ml-auto" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          )}
+          {syncing && <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-500 rounded-full animate-spin"></div>}
         </div>
       )}
 
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-        <button
-          onClick={() => setActiveTab('pelanggan')}
-          className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'pelanggan' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+      {/* Tab Buttons - Premium Design */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl">
+        <button onClick={() => setActiveTab('pelanggan')}
+          className={`flex-1 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${activeTab === 'pelanggan' ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'}`}>
           Tugas Pelanggan
           {customerTasks.length > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#0F172A] text-white text-[10px] font-bold">{customerTasks.length}</span>
+            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-deep-blue text-white text-[10px] font-bold">{customerTasks.length}</span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('operasional')}
-          className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'operasional' ? 'bg-white text-[#0F172A] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Pengiriman Operasional
+        <button onClick={() => setActiveTab('operasional')}
+          className={`flex-1 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${activeTab === 'operasional' ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'}`}>
+          Operasional
           {logisticsTasks.length > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1E3A8A] text-white text-[10px] font-bold">{logisticsTasks.length}</span>
+            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-deep-blue text-white text-[10px] font-bold">{logisticsTasks.length}</span>
           )}
         </button>
       </div>
 
+      {/* Tasks - Customer Tab */}
       {activeTab === 'pelanggan' && (
         <div className="space-y-4">
           {customerTasks.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-4xl border border-slate-100 shadow-card">
-              <svg className="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
+              <svg className="w-12 h-12 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <p className="text-sm text-slate-400">Tidak ada tugas pelanggan saat ini.</p>
+              <p className="text-sm text-slate-400">Tidak ada tugas pelanggan</p>
             </div>
           ) : (
             customerTasks.map((task) => {
@@ -286,39 +268,33 @@ export function DashboardKurir({ triggerNotification }: Props) {
               const nextStatus = NEXT_STATUS[task.status];
               const isLoading = actionLoading === task.id_order;
               return (
-                <div key={task.id_order} className="bg-white p-6 rounded-4xl border border-slate-100 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+                <div key={task.id_order} className="bg-white border border-slate-200 rounded-2xl p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h4 className="text-base font-bold text-[#0F172A]">{task.id_order}</h4>
-                      <span className={`inline-flex items-center mt-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${sb.bg} ${sb.text}`}>{task.status}</span>
+                      <h4 className="text-base font-semibold text-navy">{task.id_order}</h4>
+                      <span className={`inline-flex mt-1 px-2.5 py-1 rounded-full text-xs font-medium border ${sb.bg}`}>{task.status}</span>
                     </div>
                     {task.berat_kg != null && (
                       <span className="text-xs text-slate-500 font-medium">{task.berat_kg} kg</span>
                     )}
                   </div>
-                  <div className="space-y-3 mb-5">
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Alamat Penjemputan</span>
-                      <p className="text-sm text-[#0F172A] font-medium mt-0.5">{task.alamat_penjemputan}</p>
-                    </div>
+                  <div className="mb-4">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Alamat</p>
+                    <p className="text-sm text-slate-600">{task.alamat_penjemputan}</p>
                   </div>
-                  <div className="flex gap-2.5">
-                    <button
-                      onClick={() => window.open(task.google_maps_url, '_blank')}
-                      className="flex-1 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold py-2.5 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md flex items-center justify-center gap-2"
-                    >
+                  <div className="flex gap-2">
+                    <button onClick={() => window.open(task.google_maps_url, '_blank')}
+                      className="flex-1 bg-deep-blue hover:bg-navy text-white text-sm font-medium py-3 rounded-2xl transition-all flex items-center justify-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       Google Maps
                     </button>
                     {nextStatus && (
-                      <button
-                        onClick={() => handleCustomerStatusChange(task.id_order, nextStatus)}
+                      <button onClick={() => handleCustomerStatusChange(task.id_order, nextStatus)}
                         disabled={isLoading}
-                        className="flex-1 bg-[#047857] hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
-                      >
+                        className="flex-1 bg-teal hover:bg-teal-600 text-white text-sm font-medium py-3 rounded-2xl transition-all disabled:opacity-50">
                         {isLoading ? '...' : `Ubah ke ${nextStatus}`}
                       </button>
                     )}
@@ -330,14 +306,15 @@ export function DashboardKurir({ triggerNotification }: Props) {
         </div>
       )}
 
+      {/* Tasks - Operasional Tab */}
       {activeTab === 'operasional' && (
         <div className="space-y-4">
           {logisticsTasks.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-4xl border border-slate-100 shadow-card">
-              <svg className="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
+              <svg className="w-12 h-12 text-slate-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
               </svg>
-              <p className="text-sm text-slate-400">Tidak ada pengiriman operasional aktif.</p>
+              <p className="text-sm text-slate-400">Tidak ada pengiriman aktif</p>
             </div>
           ) : (
             logisticsTasks.map((task) => {
@@ -345,64 +322,48 @@ export function DashboardKurir({ triggerNotification }: Props) {
               const isQueued = logisticsQueue.some((q) => q.logistics_id === task.id && !q.synced);
               const isLoading = actionLoading === task.id;
               return (
-                <div key={task.id} className="bg-white p-6 rounded-4xl border border-slate-100 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+                <div key={task.id} className="bg-white border border-slate-200 rounded-2xl p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h4 className="text-base font-bold text-[#0F172A]">{task.id}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Tujuan: <span className="font-semibold text-[#0F172A]">{task.nama_cabang}</span></p>
+                      <h4 className="text-base font-semibold text-navy">{task.id}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">Tujuan: <span className="font-medium text-navy">{task.nama_cabang}</span></p>
                     </div>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold ${sb.bg} ${sb.text}`}>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-semibold border ${sb.bg}`}>
                       {logisticsStatusLabel(task.status)}
                     </span>
                   </div>
-
-                  <div className="bg-slate-50 rounded-xl p-4 mb-5 space-y-2">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">Rincian Muatan</span>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center">
-                        <span className="text-lg font-light text-[#0F172A] block">{task.sentItems.detergen}</span>
-                        <span className="text-[10px] text-slate-400 font-medium">kg Detergen</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-lg font-light text-[#0F172A] block">{task.sentItems.pelembut}</span>
-                        <span className="text-[10px] text-slate-400 font-medium">kg Pelembut</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-lg font-light text-[#0F172A] block">{task.sentItems.plastik}</span>
-                        <span className="text-[10px] text-slate-400 font-medium">pcs Plastik</span>
-                      </div>
+                  <div className="bg-base-bg rounded-2xl p-3 mb-4">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">Muatan</span>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div><span className="text-base font-semibold text-navy">{task.sentItems.detergen}</span><br /><span className="text-[10px] text-slate-400">Detergen</span></div>
+                      <div><span className="text-base font-semibold text-navy">{task.sentItems.pelembut}</span><br /><span className="text-[10px] text-slate-400">Pelembut</span></div>
+                      <div><span className="text-base font-semibold text-navy">{task.sentItems.plastik}</span><br /><span className="text-[10px] text-slate-400">Plastik</span></div>
                     </div>
                   </div>
-
                   {isQueued && (
-                    <div className="bg-[#FFFBEB] border border-amber-200/40 rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2">
                       <span className="text-xs">🔄</span>
-                      <span className="text-[10px] text-[#B45309] font-medium">Aksi tersimpan offline — menunggu sinkronisasi</span>
+                      <span className="text-[10px] text-amber-600 font-medium">Tersimpan offline</span>
                     </div>
                   )}
-
-                  <div className="flex gap-2.5">
+                  <div className="flex gap-2">
                     {task.status === 'In-Transit' && (
-                      <button
-                        onClick={() => handleStartRoute(task.id)}
+                      <button onClick={() => handleStartRoute(task.id)}
                         disabled={isLoading || isQueued}
-                        className="flex-1 bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs font-semibold py-3 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
+                        className="flex-1 bg-deep-blue hover:bg-navy text-white text-sm font-medium py-3 rounded-2xl transition-all disabled:opacity-50">
                         {isLoading ? 'Memproses...' : 'Mulai Jalan'}
                       </button>
                     )}
                     {task.status === 'Driver-En-Route' && (
-                      <button
-                        onClick={() => handleHandover(task.id)}
+                      <button onClick={() => handleHandover(task.id)}
                         disabled={isLoading || isQueued}
-                        className="flex-1 bg-[#1E3A8A] hover:bg-[#1E40AF] text-white text-xs font-semibold py-3 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoading ? 'Memproses...' : 'Serah Terima Barang'}
+                        className="flex-1 bg-teal hover:bg-teal-600 text-white text-sm font-medium py-3 rounded-2xl transition-all disabled:opacity-50">
+                        {isLoading ? 'Memproses...' : 'Serah Terima'}
                       </button>
                     )}
                     {task.status === 'Awaiting-Verification' && (
-                      <div className="flex-1 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold py-3 rounded-xl text-center">
-                        Menunggu Verifikasi Admin Cabang
+                      <div className="flex-1 bg-slate-100 text-slate-500 text-sm font-medium py-3 rounded-2xl text-center">
+                        Menunggu Verifikasi
                       </div>
                     )}
                   </div>

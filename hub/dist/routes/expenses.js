@@ -47,22 +47,24 @@ router.post('/request', (req, res) => {
         return;
     }
     const budgetCheck = (0, budget_js_1.checkOverbudget)(id_cabang, nominal);
+    // FR-FIN-03: Check if expense exceeds remaining budget allocation
     if (budgetCheck.overbudget) {
         const formatIDR = (n) => new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
             minimumFractionDigits: 0,
         }).format(n);
+        // Return exact 'Overbudget' error string per FR-FIN-03 requirement
         res.status(400).json({
             success: false,
-            error: 'PROSES DITOLAK: Overbudget!',
+            error: 'Overbudget', // Eksak sesuai FR-FIN-03: Sistem menolak pencatatan dan tampilkan error "Overbudget"
             id_cabang,
             nominal,
             pagu_anggaran: budgetCheck.pagu_anggaran,
             terpakai: budgetCheck.terpakai,
             sisa_pagu: budgetCheck.sisa_pagu,
             projected_total: budgetCheck.projected_total,
-            message: `PROSES DITOLAK: Overbudget! Pengeluaran ini (${formatIDR(nominal)}) melebihi sisa pagu anggaran bulanan ${branch.nama_cabang} yang tersisa sebesar ${formatIDR(budgetCheck.sisa_pagu)}.`,
+            message: `Pengeluaran ini (${formatIDR(nominal)}) melebihi sisa pagu anggaran bulanan ${branch.nama_cabang} sebesar ${formatIDR(budgetCheck.sisa_pagu)}. Deviasi maksimal 5% dari pagu yang ditetapkan.`,
         });
         return;
     }

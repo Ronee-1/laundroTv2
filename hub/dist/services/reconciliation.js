@@ -1,4 +1,10 @@
 "use strict";
+// ==========================================
+// RECONCILIATION SERVICE - FR-FIN-09 Core Implementation
+// Audit & Rekonsiliasi Kas - formulir input kas fisik vs kas digital harian
+// Sistem menghitung selisih (discrepancy) dan menyimpan log audit
+// Mendukung indikator sukses: Selisih kas = Rp0
+// ==========================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createReconciliation = createReconciliation;
 exports.getReconciliationByBranch = getReconciliationByBranch;

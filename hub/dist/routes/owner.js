@@ -7,18 +7,24 @@ const expense_js_1 = require("../services/expense.js");
 const budget_js_1 = require("../services/budget.js");
 const inventory_js_1 = require("../services/inventory.js");
 const logistics_js_1 = require("../services/logistics.js");
+// ==========================================
+// OWNER DASHBOARD - FR-OWN-01, FR-OWN-02, FR-OWN-03 Core Implementation
+// FR-OWN-01: Grafik tren arus kas terpadu dan profitabilitas per cabang
+// FR-OWN-02: Visualisasi data poin KPI performa seluruh cabang
+// FR-OWN-03: Dasbor Peta Interaktif Jabodetabek dengan pin dinamis
+// ==========================================
 const router = (0, express_1.Router)();
 function determineHealthStatus(utilization_percent, inventoryStatus) {
-    if (utilization_percent >= 90 || inventoryStatus === 'Habis')
+    if (utilization_percent >= 90 || inventoryStatus === 'Kritis' || inventoryStatus === 'Menipis')
         return 'Critical';
-    if (utilization_percent >= 70 || inventoryStatus === 'Menipis')
+    if (utilization_percent >= 70)
         return 'Warning';
     return 'Healthy';
 }
 function determineMapPinColor(utilization_percent, inventoryStatus) {
-    if (utilization_percent >= 90 || inventoryStatus === 'Habis')
+    if (utilization_percent >= 90 || inventoryStatus === 'Kritis' || inventoryStatus === 'Menipis')
         return 'red';
-    if (utilization_percent >= 80 || inventoryStatus === 'Menipis')
+    if (utilization_percent >= 80)
         return 'yellow';
     return 'green';
 }
@@ -91,6 +97,7 @@ router.get('/dashboard', (_req, res) => {
             inventory: {
                 stocks: inventoryData?.stocks ?? [],
                 overall_status: inventoryStatus,
+                last_updated: inventoryData?.last_updated ? inventoryData.last_updated.toISOString() : new Date().toISOString(),
             },
             in_transit: inTransitLogs.map((l) => ({
                 id: l.id,
@@ -123,6 +130,12 @@ router.get('/dashboard', (_req, res) => {
         },
         per_cabang: perCabang,
         generated_at: new Date().toISOString(),
+    });
+});
+router.get('/anomalies', (_req, res) => {
+    res.status(200).json({
+        success: true,
+        anomalies: (0, inventory_js_1.getAnomalies)(),
     });
 });
 exports.default = router;

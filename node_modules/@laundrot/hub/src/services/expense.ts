@@ -1,3 +1,10 @@
+// ==========================================
+// EXPENSE SERVICE - FR-FIN-08 Core Implementation
+// Formulir input pengeluaran operasional harian
+// (tanggal, nominal, kategori kustom, bukti nota)
+// Extends: FR-FIN-02 (approval), FR-FIN-03 (overbudget)
+// ==========================================
+
 export type ExpenseStatus = 'Pending' | 'Approve' | 'Reject';
 
 export type ExpenseCategory =

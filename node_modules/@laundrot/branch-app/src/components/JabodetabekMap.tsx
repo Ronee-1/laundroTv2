@@ -1,3 +1,10 @@
+// ==========================================
+// JABODETABEK MAP - FR-OWN-03 Supporting Extension
+// Dasbor Peta Interaktif wilayah Jabodetabek dengan pin berwarna dinamis
+// Hijau = Aman, Kuning = Peringatan, Merah = Kritis
+// Mendukung: FR-OWN-01 (Dashboard Utama Keuangan Eksekutif)
+// ==========================================
+
 interface MapPin {
   id_cabang: string;
   nama_cabang: string;

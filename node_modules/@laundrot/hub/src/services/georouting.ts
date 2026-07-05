@@ -1,6 +1,12 @@
 import type { Branch } from '@laundrot/shared-types';
 import { getActiveBranches } from '../config/branches.js';
 
+// ==========================================
+// GEOROUTING SERVICE - FR-LOG-01 Core Implementation
+// Admin Pusat merekomendasikan cabang pemroses berdasarkan jarak terdekat
+// dengan koordinat pelanggan ketika menginput data alamat dari WhatsApp
+// ==========================================
+
 interface Coordinates {
   latitude: number;
   longitude: number;

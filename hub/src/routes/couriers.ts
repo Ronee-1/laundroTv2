@@ -1,6 +1,11 @@
 import { Router, type Request, type Response } from 'express';
-import { getCourierById } from '../config/couriers.js';
+import { getCourierById, getCouriersByBranch } from '../config/couriers.js';
 import { getOrdersByCourier } from '../config/orders.js';
+
+// ==========================================
+// COURIERS ROUTES - FR-LOG-03 Implementation
+// Courier task management and branch courier listing
+// ==========================================
 
 const router = Router();
 
@@ -78,6 +83,43 @@ router.get(
       id_cabang: courier.id_cabang,
       total_tugas: tugas.length,
       tugas,
+    });
+  },
+);
+
+// ==========================================
+// GET COURIERS BY BRANCH - FR-LOG-02 Support
+// Returns list of couriers for a specific branch
+// Used by branch admin to assign orders to couriers
+// ==========================================
+
+interface BranchCouriersResponse {
+  success: boolean;
+  id_cabang: string;
+  couriers: Array<{
+    id_kurir: string;
+    nama_kurir: string;
+    nomor_telepon: string;
+    is_available: boolean;
+  }>;
+}
+
+router.get(
+  '/branch/:id_cabang',
+  (req: Request<{ id_cabang: string }>, res: Response<BranchCouriersResponse>) => {
+    const { id_cabang } = req.params;
+
+    const couriers = getCouriersByBranch(id_cabang);
+
+    res.status(200).json({
+      success: true,
+      id_cabang,
+      couriers: couriers.map((c) => ({
+        id_kurir: c.id_kurir,
+        nama_kurir: c.nama_kurir,
+        nomor_telepon: c.nomor_telepon,
+        is_available: c.is_available,
+      })),
     });
   },
 );

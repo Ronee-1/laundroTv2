@@ -4,6 +4,12 @@ const express_1 = require("express");
 const branches_js_1 = require("../config/branches.js");
 const logistics_js_1 = require("../services/logistics.js");
 const inventory_js_1 = require("../services/inventory.js");
+// ==========================================
+// LOGISTICS ROUTES - FR-LOG-02 Core Implementation
+// Admin Cabang men-generate rute harian (batching) yang hanya mengeksekusi
+// daftar pesanan teralokasi di cabangnya sendiri
+// Mendukung: FR-LOG-01 (georouting), FR-INV-01 (inventory monitoring)
+// ==========================================
 const router = (0, express_1.Router)();
 router.post('/ship', (req, res) => {
     const { branchId, sentItems } = req.body;

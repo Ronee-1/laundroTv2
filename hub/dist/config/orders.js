@@ -5,6 +5,14 @@ exports.getOrdersByCourier = getOrdersByCourier;
 exports.getOrdersByBranch = getOrdersByBranch;
 exports.getOrderById = getOrderById;
 exports.updateOrderStatus = updateOrderStatus;
+exports.createOrderFromWhatsApp = createOrderFromWhatsApp;
+exports.getIncomingOrdersByBranch = getIncomingOrdersByBranch;
+exports.getAllOrdersByBranch = getAllOrdersByBranch;
+// ==========================================
+// ORDERS CONFIG - FR-LOG-01, FR-LOG-02 Integration
+// WhatsApp Order Hub allocates orders to nearest branch
+// Branch admin receives allocated orders for batch processing
+// ==========================================
 exports.ORDERS = [
     {
         id_order: 'ORD-001',
@@ -15,7 +23,7 @@ exports.ORDERS = [
         alamat_pengantaran: 'Jl. Kemang Selatan No. 5, Jakarta Selatan',
         koordinat_penjemputan: { latitude: -6.2650, longitude: 106.8130 },
         koordinat_pengantaran: { latitude: -6.2650, longitude: 106.8130 },
-        status: 'Diproses',
+        status: 'Pending',
         berat_kg: 3.5,
         total_harga: 70000,
         tanggal_order: new Date('2024-06-01'),
@@ -31,7 +39,7 @@ exports.ORDERS = [
         alamat_pengantaran: 'Jl. Bangka Raya No. 12, Jakarta Selatan',
         koordinat_penjemputan: { latitude: -6.2710, longitude: 106.8200 },
         koordinat_pengantaran: { latitude: -6.2710, longitude: 106.8200 },
-        status: 'Siap Diantar',
+        status: 'On Route',
         berat_kg: 2.0,
         total_harga: 40000,
         tanggal_order: new Date('2024-06-01'),
@@ -47,7 +55,7 @@ exports.ORDERS = [
         alamat_pengantaran: 'Jl. Puri Indah Blok A No. 8, Jakarta Barat',
         koordinat_penjemputan: { latitude: -6.1850, longitude: 106.7400 },
         koordinat_pengantaran: { latitude: -6.1850, longitude: 106.7400 },
-        status: 'Diproses',
+        status: 'Pending',
         berat_kg: 5.0,
         total_harga: 100000,
         tanggal_order: new Date('2024-06-01'),
@@ -86,9 +94,43 @@ function updateOrderStatus(id_order, newStatus) {
         return null;
     order.status = newStatus;
     order.updated_at = new Date();
-    if (newStatus === 'Selesai' || newStatus === 'Lunas') {
+    if (newStatus === 'Selesai' || newStatus === 'Lunas' || newStatus === 'Done') {
         order.tanggal_selesai = new Date();
     }
     return order;
+}
+function createOrderFromWhatsApp(params) {
+    const id_order = `ORD-WA-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const order = {
+        id_order,
+        id_cabang: params.id_cabang,
+        id_pelanggan: `PLG-${Date.now()}`,
+        id_kurir: '', // Will be assigned by branch admin
+        alamat_penjemputan: params.alamat_penjemputan,
+        alamat_pengantaran: params.alamat_penjemputan,
+        koordinat_penjemputan: params.koordinat_penjemputan,
+        koordinat_pengantaran: params.koordinat_penjemputan,
+        status: 'Pending',
+        berat_kg: params.berat_kg,
+        total_harga: 0, // Will be calculated based on service
+        customer_name: params.customer_name,
+        customer_whatsapp: params.customer_whatsapp,
+        service_type: params.service_type,
+        wilayah: params.wilayah,
+        google_maps_url: params.google_maps_url,
+        tanggal_order: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+    };
+    exports.ORDERS.push(order);
+    return order;
+}
+// Get all incoming orders for a branch (WhatsApp allocated orders)
+function getIncomingOrdersByBranch(id_cabang) {
+    return exports.ORDERS.filter((o) => o.id_cabang === id_cabang && o.status === 'Pending');
+}
+// Get all orders for branch (including processed)
+function getAllOrdersByBranch(id_cabang) {
+    return exports.ORDERS.filter((o) => o.id_cabang === id_cabang);
 }
 //# sourceMappingURL=orders.js.map

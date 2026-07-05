@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MACRO_FINANCIALS = void 0;
 exports.getBudget = getBudget;
 exports.getSisaPagu = getSisaPagu;
 exports.deductBudget = deductBudget;
 exports.checkOverbudget = checkOverbudget;
+const branches_js_1 = require("../config/branches.js");
+Object.defineProperty(exports, "MACRO_FINANCIALS", { enumerable: true, get: function () { return branches_js_1.MACRO_FINANCIALS; } });
 const BUDGETS = [
     {
         id_cabang: 'CBG-001',
@@ -38,7 +41,7 @@ const BUDGETS = [
         bulan: 'Juli',
         tahun: 2026,
         pagu_anggaran: 4000000,
-        terpakai: 3850000,
+        terpakai: 3850000, // Near limit - 96.25% utilized
     },
 ];
 function getBudget(id_cabang, bulan, tahun) {

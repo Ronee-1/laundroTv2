@@ -3,6 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const couriers_js_1 = require("../config/couriers.js");
 const orders_js_1 = require("../config/orders.js");
+// ==========================================
+// COURIERS ROUTES - FR-LOG-03 Implementation
+// Courier task management and branch courier listing
+// ==========================================
 const router = (0, express_1.Router)();
 function buildGoogleMapsUrl(lat, lng) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
@@ -43,6 +47,20 @@ router.get('/:id_kurir/tasks', (req, res) => {
         id_cabang: courier.id_cabang,
         total_tugas: tugas.length,
         tugas,
+    });
+});
+router.get('/branch/:id_cabang', (req, res) => {
+    const { id_cabang } = req.params;
+    const couriers = (0, couriers_js_1.getCouriersByBranch)(id_cabang);
+    res.status(200).json({
+        success: true,
+        id_cabang,
+        couriers: couriers.map((c) => ({
+            id_kurir: c.id_kurir,
+            nama_kurir: c.nama_kurir,
+            nomor_telepon: c.nomor_telepon,
+            is_available: c.is_available,
+        })),
     });
 });
 exports.default = router;

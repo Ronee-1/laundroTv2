@@ -7,8 +7,15 @@ import {
   getTotalApprovedExpenses,
 } from '../services/expense.js';
 import { getBudget } from '../services/budget.js';
-import { getInventoryByBranch, getInventoryStatus, type StockEntry } from '../services/inventory.js';
+import { getInventoryByBranch, getInventoryStatus, type StockEntry, getAnomalies } from '../services/inventory.js';
 import { getActiveShipmentsByBranch, getReplenishmentRecommendation } from '../services/logistics.js';
+
+// ==========================================
+// OWNER DASHBOARD - FR-OWN-01, FR-OWN-02, FR-OWN-03 Core Implementation
+// FR-OWN-01: Grafik tren arus kas terpadu dan profitabilitas per cabang
+// FR-OWN-02: Visualisasi data poin KPI performa seluruh cabang
+// FR-OWN-03: Dasbor Peta Interaktif Jabodetabek dengan pin dinamis
+// ==========================================
 
 const router = Router();
 
@@ -30,7 +37,8 @@ interface MapCoordinates {
 
 interface InventoryData {
   stocks: StockEntry[];
-  overall_status: 'Aman' | 'Menipis' | 'Habis';
+  overall_status: 'Aman' | 'Menipis' | 'Kritis';
+  last_updated: string;
 }
 
 interface InTransitData {
@@ -91,17 +99,17 @@ interface DashboardResponse {
 }
 
 function determineHealthStatus(utilization_percent: number, inventoryStatus: string): HealthStatus {
-  if (utilization_percent >= 90 || inventoryStatus === 'Habis') return 'Critical';
-  if (utilization_percent >= 70 || inventoryStatus === 'Menipis') return 'Warning';
+  if (utilization_percent >= 90 || inventoryStatus === 'Kritis' || inventoryStatus === 'Menipis') return 'Critical';
+  if (utilization_percent >= 70) return 'Warning';
   return 'Healthy';
 }
 
 function determineMapPinColor(
   utilization_percent: number,
-  inventoryStatus: 'Aman' | 'Menipis' | 'Habis',
+  inventoryStatus: 'Aman' | 'Menipis' | 'Kritis',
 ): MapPinColor {
-  if (utilization_percent >= 90 || inventoryStatus === 'Habis') return 'red';
-  if (utilization_percent >= 80 || inventoryStatus === 'Menipis') return 'yellow';
+  if (utilization_percent >= 90 || inventoryStatus === 'Kritis' || inventoryStatus === 'Menipis') return 'red';
+  if (utilization_percent >= 80) return 'yellow';
   return 'green';
 }
 
@@ -191,6 +199,7 @@ router.get('/dashboard', (_req: Request, res: Response<DashboardResponse>) => {
       inventory: {
         stocks: inventoryData?.stocks ?? [],
         overall_status: inventoryStatus,
+        last_updated: inventoryData?.last_updated ? inventoryData.last_updated.toISOString() : new Date().toISOString(),
       },
       in_transit: inTransitLogs.map((l) => ({
         id: l.id,
@@ -227,6 +236,13 @@ router.get('/dashboard', (_req: Request, res: Response<DashboardResponse>) => {
     },
     per_cabang: perCabang,
     generated_at: new Date().toISOString(),
+  });
+});
+
+router.get('/anomalies', (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    anomalies: getAnomalies(),
   });
 });
 

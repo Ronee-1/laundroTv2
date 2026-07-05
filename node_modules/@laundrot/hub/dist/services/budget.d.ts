@@ -1,3 +1,4 @@
+import { MACRO_FINANCIALS } from '../config/branches.js';
 export interface MonthlyBudget {
     id_cabang: string;
     bulan: string;
@@ -5,6 +6,7 @@ export interface MonthlyBudget {
     pagu_anggaran: number;
     terpakai: number;
 }
+export { MACRO_FINANCIALS };
 export declare function getBudget(id_cabang: string, bulan?: string, tahun?: number): MonthlyBudget | undefined;
 export declare function getSisaPagu(id_cabang: string): number;
 export declare function deductBudget(id_cabang: string, nominal: number): boolean;

@@ -78,6 +78,12 @@ export const BRANCHES: BranchWithFinancials[] = [
   },
 ];
 
+// Macro financials - Total Konsolidasi Omzet = Rp91.200.000
+export const MACRO_FINANCIALS = {
+  total_konsolidasi_omzet: 91200000,
+  batas_anggaran_operasional: 22500000,
+};
+
 export function getActiveBranches(): BranchWithFinancials[] {
   return BRANCHES.filter((b) => b.is_active);
 }

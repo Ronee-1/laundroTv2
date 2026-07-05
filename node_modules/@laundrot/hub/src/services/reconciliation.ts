@@ -1,3 +1,10 @@
+// ==========================================
+// RECONCILIATION SERVICE - FR-FIN-09 Core Implementation
+// Audit & Rekonsiliasi Kas - formulir input kas fisik vs kas digital harian
+// Sistem menghitung selisih (discrepancy) dan menyimpan log audit
+// Mendukung indikator sukses: Selisih kas = Rp0
+// ==========================================
+
 export type ApprovalStatus = 'Pending' | 'Disetujui' | 'Ditolak';
 
 export interface ReconciliationLog {

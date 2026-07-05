@@ -1,3 +1,11 @@
+import { MACRO_FINANCIALS } from '../config/branches.js';
+
+// ==========================================
+// BUDGET SERVICE - FR-FIN-03 Core Implementation
+// Kontrol anggaran ketat (Anti-Overbudget)
+// Deviasi pengeluaran bulanan maksimal 5% dari pagu yang ditetapkan
+// ==========================================
+
 export interface MonthlyBudget {
   id_cabang: string;
   bulan: string;
@@ -40,9 +48,12 @@ const BUDGETS: MonthlyBudget[] = [
     bulan: 'Juli',
     tahun: 2026,
     pagu_anggaran: 4000000,
-    terpakai: 3850000,
+    terpakai: 3850000, // Near limit - 96.25% utilized
   },
 ];
+
+// Export macro financials for dashboard
+export { MACRO_FINANCIALS };
 
 export function getBudget(id_cabang: string, bulan?: string, tahun?: number): MonthlyBudget | undefined {
   const now = new Date();

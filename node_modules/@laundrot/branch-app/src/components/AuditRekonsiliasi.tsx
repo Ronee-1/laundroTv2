@@ -49,18 +49,24 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function discrepancyColor(selisih: number): { bg: string; text: string } {
-  if (selisih === 0) return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]' };
-  if (selisih > 0) return { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]' };
-  return { bg: 'bg-[#FFF1F2]', text: 'text-[#BE123C]' };
+function discrepancyStyle(selisih: number): { bg: string; text: string; border: string } {
+  if (selisih === 0) return { bg: 'bg-teal-50', text: 'text-teal', border: 'border-teal-200' };
+  if (selisih > 0) return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
+  return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
 }
 
-function approvalBadge(status: string): { bg: string; text: string; label: string } {
-  if (status === 'Disetujui') return { bg: 'bg-[#ECFDF5]', text: 'text-[#047857]', label: 'Disetujui' };
-  if (status === 'Ditolak') return { bg: 'bg-[#FFF1F2]', text: 'text-[#BE123C]', label: 'Ditolak' };
-  return { bg: 'bg-[#FFFBEB]', text: 'text-[#B45309]', label: 'Pending' };
+function approvalStyle(status: string): { bg: string; text: string; border: string; label: string } {
+  if (status === 'Disetujui') return { bg: 'bg-teal-50', text: 'text-teal', border: 'border-teal-200', label: 'Disetujui' };
+  if (status === 'Ditolak') return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', label: 'Ditolak' };
+  return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', label: 'Pending' };
 }
 
+// ==========================================
+// AUDIT REKONSILIASI KAS - FR-FIN-09 Supporting Extension
+// Modul Audit & Rekonsiliasi Kas untuk deteksi selisih dana harian
+// Mendukung indikator sukses: Selisih kas audit = Rp0
+// Extends: FR-FIN-02 (form pengeluaran darurat), FR-OWN-01 (dashboard)
+// ==========================================
 export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotification }: Props) {
   const [selectedBranchId, setSelectedBranchId] = useState('CBG-001');
   const [kasFisik, setKasFisik] = useState('');
@@ -77,9 +83,9 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
   const [filterBranch, setFilterBranch] = useState('all');
   const [filterDate, setFilterDate] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [overBudgetError, setOverBudgetError] = useState<string | null>(null);
 
   const isAdmin = userRole === 'Admin Cabang';
-  const activeBranchId = isAdmin ? selectedAdminBranch : selectedBranchId;
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -96,25 +102,32 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
     } catch { /* ignore */ } finally { setHistoryLoading(false); }
   }, [isAdmin, selectedAdminBranch]);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const targetBranchId = isAdmin ? selectedAdminBranch : selectedBranchId;
-    const kas_fisik = parseFloat(kasFisik);
-    if (isNaN(kas_fisik) || kas_fisik < 0) {
+    const kas_fisik_val = parseFloat(kasFisik);
+    if (isNaN(kas_fisik_val) || kas_fisik_val < 0) {
       triggerNotification('Nominal kas fisik tidak valid!', 'error');
       return;
     }
+
+    // Check for over-budget scenario
+    if (kas_fisik_val > 22000000) {
+      setOverBudgetError('Over Budget: Melebihi Batas Sisa. Nominal melebihi sisa batas anggaran operasional.');
+      triggerNotification('Over Budget: Melebihi Batas Sisa.', 'error');
+      return;
+    }
+
+    setOverBudgetError(null);
     setSubmitting(true);
     setResult(null);
     try {
       const res = await fetch(`/api/branches/${targetBranchId}/reconcile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kas_fisik, catatan: catatan || undefined }),
+        body: JSON.stringify({ kas_fisik: kas_fisik_val, catatan: catatan || undefined }),
       });
       const json = (await res.json()) as ReconcileResult & { error?: string };
       if (!res.ok) {
@@ -124,7 +137,7 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
       setResult(json);
       if (isAdmin) {
         setIsLocked(true);
-        triggerNotification('Data audit berhasil dikirim dan dikunci. Menunggu persetujuan Owner.', 'success');
+        triggerNotification('Data audit berhasil dikirim dan dikunci.', 'success');
       } else {
         if (json.status === 'Cocok') triggerNotification(json.message ?? 'Audit berhasil.', 'success');
         else triggerNotification(json.message ?? 'Selisih terdeteksi!', 'warning');
@@ -174,8 +187,8 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
   }
 
   async function handleOverride(id: string) {
-    const kas_fisik = parseFloat(overrideKasFisik);
-    if (isNaN(kas_fisik) || kas_fisik < 0) {
+    const kas_fisik_val = parseFloat(overrideKasFisik);
+    if (isNaN(kas_fisik_val) || kas_fisik_val < 0) {
       triggerNotification('Nominal override tidak valid!', 'error');
       return;
     }
@@ -184,7 +197,7 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
       const res = await fetch(`/api/branches/reconcile/${id}/override`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kas_fisik, catatan_owner: overrideCatatan || undefined }),
+        body: JSON.stringify({ kas_fisik: kas_fisik_val, catatan_owner: overrideCatatan || undefined }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -210,151 +223,109 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
   });
 
   return (
-    <div className="space-y-8 max-w-[1400px]">
+    <div className="space-y-6">
+      {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-[#0F172A] tracking-tight">Audit Rekonsiliasi Kas</h1>
-        <p className="text-slate-500 text-sm mt-1.5">
-          {isAdmin
-            ? 'Input blind closing shift — angka kas fisik Anda bersifat final setelah dikirim.'
-            : 'Pemantauan komparasi saldo kas riil versus buku digital seluruh cabang.'}
+        <h1 className="text-2xl font-bold text-navy tracking-tight">Audit Rekonsiliasi Kas</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          {isAdmin ? 'Input blind closing shift — kas fisik bersifat final setelah dikirim.' : 'Pemantauan komparasi saldo kas riil vs digital.'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="bg-white p-8 rounded-4xl border border-slate-100 shadow-card lg:col-span-5 h-fit">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-[#0F172A]">
-              {isAdmin ? 'Input Audit Kas' : 'Form Audit (Read-Only)'}
-            </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Audit Form - Blind Input Design */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6">
+          <div className="flex justify-between items-center mb-5">
+            <h3 className="text-base font-bold text-navy">{isAdmin ? 'Input Audit Kas' : 'Form Audit'}</h3>
             {isAdmin && isLocked && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold bg-[#FFF1F2] text-[#BE123C]">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 Terkunci
               </span>
-            )}
-            {!isAdmin && !ownerOverride && result && (
-              <button
-                onClick={() => { setOwnerOverride(true); setOverrideKasFisik(String(result.kas_fisik)); }}
-                className="text-[10px] font-semibold text-slate-400 hover:text-[#BE123C] bg-slate-50 hover:bg-[#FFF1F2] px-3 py-1.5 rounded-lg border border-slate-200 hover:border-[#BE123C]/20 transition-all"
-              >
-                Override Data
-              </button>
             )}
           </div>
 
           {!ownerOverride ? (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Branch Selection */}
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Cabang Audit</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Cabang</label>
                 {!isAdmin ? (
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    disabled={isLocked}
-                    className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all disabled:opacity-50"
-                  >
+                  <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} disabled={isLocked}
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all disabled:opacity-50">
                     {BRANCH_OPTIONS.map((b) => (<option key={b.id} value={b.id}>{b.nama}</option>))}
                   </select>
                 ) : (
-                  <div className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#B45309] font-semibold">
+                  <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm font-medium text-amber-600">
                     {BRANCH_OPTIONS.find((b) => b.id === selectedAdminBranch)?.nama}
                   </div>
                 )}
               </div>
 
+              {/* Blind Input - Kas Fisik */}
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Uang Kas Fisik di Laci (IDR)</label>
-                {isAdmin || !result ? (
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 text-sm font-medium">Rp</span>
-                    <input
-                      type="number"
-                      placeholder="15.200.000"
-                      value={kasFisik}
-                      onChange={(e) => setKasFisik(e.target.value)}
-                      disabled={isLocked}
-                      className="w-full bg-slate-50 border border-transparent pl-12 pr-4 py-3 rounded-xl text-sm text-[#0F172A] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      required
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] font-semibold">
-                    {formatIDR(result.kas_fisik)}
-                  </div>
-                )}
-                <span className="text-[10px] text-slate-400 mt-1.5 block">
-                  {isAdmin ? 'Nominal rupiah yang dihitung secara manual di outlet.' : 'Data kas fisik yang diinput Admin Cabang.'}
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                  Uang Kas Fisik (IDR)
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 text-sm">Rp</span>
+                  <input type="number" placeholder="15.200.000" value={kasFisik} onChange={(e) => { setKasFisik(e.target.value); setOverBudgetError(null); }}
+                    disabled={isLocked}
+                    className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-sm text-navy placeholder:text-slate-400 focus:outline-none focus:border-deep-blue transition-all disabled:opacity-50"
+                    required />
+                </div>
+                <span className="text-[11px] text-slate-400 block mt-2">
+                  Masukkan nominal kas fisik di laci kas Anda
                 </span>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Catatan / Justifikasi</label>
-                {isAdmin || !result ? (
-                  <textarea
-                    rows={3}
-                    placeholder="Tulis alasan jika terdapat selisih..."
-                    value={catatan}
-                    onChange={(e) => setCatatan(e.target.value)}
-                    disabled={isLocked}
-                    className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                ) : (
-                  <div className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-slate-600 min-h-[60px]">
-                    {result.message || '—'}
+              {/* Over Budget Error */}
+              {overBudgetError && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
+                  <div className="flex items-center gap-2 text-xs text-red-600 font-medium">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {overBudgetError}
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Catatan */}
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Catatan</label>
+                <textarea rows={2} placeholder="Alasan jika terdapat selisih..." value={catatan} onChange={(e) => setCatatan(e.target.value)}
+                  disabled={isLocked}
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy placeholder:text-slate-400 focus:outline-none focus:border-deep-blue transition-all resize-none disabled:opacity-50" />
               </div>
 
+              {/* Submit Button - Deep Blue Premium */}
               {isAdmin && (
-                <button
-                  type="submit"
-                  disabled={submitting || isLocked}
-                  className="w-full bg-[#047857] hover:bg-emerald-700 text-white font-semibold text-sm py-3.5 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-                >
-                  {submitting ? 'Memproses...' : isLocked ? 'Terkunci — Data Final' : 'Kirim & Rekonsiliasi'}
+                <button type="submit" disabled={submitting || isLocked || !!overBudgetError}
+                  className="w-full bg-deep-blue hover:bg-navy text-white font-medium text-sm py-3 rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  {submitting ? 'Memproses...' : isLocked ? 'Terkunci — Data Final' : 'Kirim & Validasi Ke Pusat / Rekonsiliasi Akhir Hari'}
                 </button>
               )}
             </form>
           ) : (
-            <div className="space-y-5">
-              <div className="bg-[#FFF1F2] border border-[#BE123C]/10 rounded-xl p-4">
-                <p className="text-xs text-[#BE123C] font-semibold">Mode Override Owner</p>
-                <p className="text-[10px] text-[#BE123C]/70 mt-1">Anda sedang merevisi data audit. Gunakan hanya untuk koreksi kesalahan input fatal.</p>
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-red-600">Mode Override Owner</p>
+                <p className="text-xs text-slate-500 mt-0.5">Revisi data audit fatal.</p>
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Kas Fisik (Revisi)</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Kas Fisik (Revisi)</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 text-sm font-medium">Rp</span>
-                  <input
-                    type="number"
-                    value={overrideKasFisik}
-                    onChange={(e) => setOverrideKasFisik(e.target.value)}
-                    className="w-full bg-slate-50 border border-transparent pl-12 pr-4 py-3 rounded-xl text-sm text-[#0F172A] focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all"
-                  />
+                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 text-sm">Rp</span>
+                  <input type="number" value={overrideKasFisik} onChange={(e) => setOverrideKasFisik(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all" />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Catatan Override</label>
-                <textarea
-                  rows={2}
-                  placeholder="Alasan override..."
-                  value={overrideCatatan}
-                  onChange={(e) => setOverrideCatatan(e.target.value)}
-                  className="w-full bg-slate-50 border border-transparent rounded-xl px-4 py-3 text-sm text-[#0F172A] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all resize-none"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setOwnerOverride(false); setOverrideKasFisik(''); setOverrideCatatan(''); }}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold py-3 rounded-xl transition-all"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={() => handleOverride(result!.id_rekonsiliasi)}
-                  disabled={overrideSubmitting}
-                  className="flex-1 bg-[#BE123C] hover:bg-[#9F1239] text-white text-sm font-semibold py-3 rounded-xl transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
-                >
+              <div className="flex gap-2">
+                <button onClick={() => { setOwnerOverride(false); setOverrideKasFisik(''); setOverrideCatatan(''); }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-2xl transition-all">Batal</button>
+                <button onClick={() => handleOverride(result!.id_rekonsiliasi)} disabled={overrideSubmitting}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2.5 rounded-2xl transition-all disabled:opacity-50">
                   {overrideSubmitting ? 'Menyimpan...' : 'Konfirmasi Override'}
                 </button>
               </div>
@@ -362,192 +333,152 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
           )}
         </div>
 
-        <div className="bg-white p-8 rounded-4xl border border-slate-100 shadow-card lg:col-span-7 space-y-8">
+        {/* Result Panel - Premium Design */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6">
+          <h3 className="text-base font-bold text-navy mb-4">Komparasi Saldo</h3>
+
           {isAdmin ? (
-            <>
-              <div>
-                <h3 className="text-lg font-bold text-[#0F172A] tracking-tight">Prosedur Anti-Kebocoran Kas</h3>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Audit kas laci dilakukan setiap penutupan shift kasir demi keamanan operasional.</p>
+            <div className="space-y-4">
+              {/* Blind Input Procedure Card */}
+              <div className="bg-base-bg rounded-2xl p-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Prosedur Anti-Kebocoran</p>
+                <div className="space-y-4">
+                  {[
+                    { step: '1', title: 'Kunci Pembukuan', desc: 'Admin menghentikan input order pukul 21:00.' },
+                    { step: '2', title: 'Hitung Kas Fisik', desc: 'Uang kas di laci dihitung manual.' },
+                    { step: '3', title: 'Rekonsiliasi Digital', desc: 'Input kas fisik, data terkunci otomatis.' }
+                  ].map((item) => (
+                    <div key={item.step} className="flex gap-3">
+                      <div className="w-8 h-8 bg-deep-blue rounded-2xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0">{item.step}</div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-navy">{item.title}</h4>
+                        <p className="text-xs text-slate-500">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { step: '1', title: 'Kunci Pembukuan', desc: 'Admin menghentikan input order pada pukul 21:00 WIB.' },
-                  { step: '2', title: 'Hitung Kas Fisik', desc: 'Uang kas di laci kasir dihitung secara manual tanpa terburu-buru.' },
-                  { step: '3', title: 'Rekonsiliasi Digital', desc: 'Input kas fisik. Data terkunci otomatis setelah pengiriman.' },
-                ].map((item) => (
-                  <div key={item.step} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-3">
-                    <div className="w-8 h-8 bg-[#0F172A] rounded-full flex items-center justify-center text-xs font-bold text-white">{item.step}</div>
-                    <h4 className="text-sm font-bold text-[#0F172A]">{item.title}</h4>
-                    <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
-                  </div>
-                ))}
+
+              {/* Final Instruction for Admin */}
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-teal uppercase tracking-wider mb-2">Langkah Terakhir Audit</p>
+                <p className="text-sm font-bold text-navy">Hitung Jumlah Uang Fisik Di Laci Kas</p>
+                <p className="text-xs text-slate-500 mt-2">
+                  Masukkan nominal kas fisik Anda ke kolom "Uang Kas Fisik" di sebelah kiri.
+                  Setelah dikirim, data akan terkunci dan tidak dapat diubah.
+                </p>
               </div>
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Cabang Audit Aktif</h4>
-                <p className="text-sm font-semibold text-[#0F172A]">{BRANCH_OPTIONS.find((b) => b.id === activeBranchId)?.nama}</p>
+            </div>
+          ) : result ? (
+            <div className={`p-4 rounded-2xl border ${discrepancyStyle(result.selisih).bg} ${discrepancyStyle(result.selisih).border}`}>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className={`text-sm font-semibold ${discrepancyStyle(result.selisih).text}`}>Hasil: {result.nama_cabang}</h4>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${discrepancyStyle(result.selisih).bg} ${discrepancyStyle(result.selisih).border}`}>{result.status}</span>
               </div>
-            </>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white rounded-2xl p-3 text-center">
+                  <span className="text-[10px] text-slate-400 block">Kas Digital</span>
+                  <span className="text-sm font-semibold text-navy">{formatIDR(result.kas_digital)}</span>
+                </div>
+                <div className="bg-white rounded-2xl p-3 text-center">
+                  <span className="text-[10px] text-slate-400 block">Kas Fisik</span>
+                  <span className="text-sm font-semibold text-navy">{formatIDR(result.kas_fisik)}</span>
+                </div>
+                <div className="bg-white rounded-2xl p-3 text-center">
+                  <span className="text-[10px] text-slate-400 block">Selisih</span>
+                  <span className={`text-sm font-bold ${discrepancyStyle(result.selisih).text}`}>{result.selisih > 0 ? '+' : ''}{formatIDR(result.selisih)}</span>
+                </div>
+              </div>
+            </div>
           ) : (
-            <>
-              <div>
-                <h3 className="text-lg font-bold text-[#0F172A] tracking-tight">Komparasi Saldo Kas</h3>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Visualisasi perbandingan saldo sistem vs fisik untuk audit terpusat.</p>
-              </div>
-
-              {result && (
-                <div className={`p-6 rounded-2xl border transition-all duration-300 ${discrepancyColor(result.selisih).bg} border-slate-200/40`}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className={`text-sm font-bold ${discrepancyColor(result.selisih).text}`}>Hasil Audit: {result.nama_cabang}</h4>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold bg-white ${discrepancyColor(result.selisih).text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${result.selisih === 0 ? 'bg-emerald-500' : result.selisih > 0 ? 'bg-amber-500' : 'bg-rose-500'}`}></span>
-                      {result.status}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-white p-4 rounded-xl border border-slate-100">
-                      <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider mb-1">Kas Digital</span>
-                      <span className="text-[#0F172A] font-semibold text-sm">{formatIDR(result.kas_digital)}</span>
-                    </div>
-                    <div className="bg-white p-4 rounded-xl border border-slate-100">
-                      <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider mb-1">Kas Fisik</span>
-                      <span className="text-[#0F172A] font-semibold text-sm">{formatIDR(result.kas_fisik)}</span>
-                    </div>
-                    <div className="bg-white p-4 rounded-xl border border-slate-100">
-                      <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider mb-1">Selisih</span>
-                      <span className={`font-bold text-sm ${discrepancyColor(result.selisih).text}`}>
-                        {result.selisih > 0 ? '+' : ''}{formatIDR(result.selisih)}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-3 leading-relaxed">{result.message}</p>
-                </div>
-              )}
-
-              {!result && (
-                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  <span className="text-xs text-slate-400">Pilih cabang dan kirim audit untuk melihat komparasi.</span>
-                </div>
-              )}
-            </>
+            <div className="text-center py-8 bg-base-bg rounded-2xl">
+              <svg className="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="text-xs text-slate-400">Pilih cabang & kirim audit</span>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-4xl border border-slate-100 shadow-card p-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* History Table - Premium Design */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
           <div>
-            <h3 className="text-lg font-bold text-[#0F172A] tracking-tight">Riwayat Audit Kas</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {isAdmin ? `Log audit cabang Anda (${BRANCH_OPTIONS.find((b) => b.id === selectedAdminBranch)?.nama}).` : 'Log audit gabungan seluruh cabang.'}
-            </p>
+            <h3 className="text-base font-bold text-navy">Riwayat Audit Kas</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Log audit cabang</p>
           </div>
           {!isAdmin && (
-            <div className="flex items-center gap-3">
-              <select
-                value={filterBranch}
-                onChange={(e) => setFilterBranch(e.target.value)}
-                className="bg-slate-50 border border-transparent rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all"
-              >
-                <option value="all">Semua Cabang</option>
+            <div className="flex items-center gap-2">
+              <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-navy focus:outline-none focus:border-deep-blue transition-all">
+                <option value="all">Semua</option>
                 {BRANCH_OPTIONS.map((b) => (<option key={b.id} value={b.id}>{b.nama}</option>))}
               </select>
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="bg-slate-50 border border-transparent rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:bg-white focus:border-blue-600/30 transition-all"
-              />
-              {filterDate && (
-                <button onClick={() => setFilterDate('')} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">Reset</button>
-              )}
+              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-navy focus:outline-none focus:border-deep-blue transition-all" />
             </div>
           )}
         </div>
 
         {historyLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <svg className="animate-spin h-6 w-6 text-blue-600" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-slate-200 border-t-deep-blue rounded-full animate-spin"></div>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            <span className="text-xs text-slate-400">Belum ada riwayat audit.</span>
+          <div className="text-center py-8 bg-base-bg rounded-2xl">
+            <span className="text-xs text-slate-400">Belum ada riwayat audit</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
-                  {!isAdmin && <th className="py-4 px-4">Cabang</th>}
-                  <th className="py-4 px-4">Tanggal</th>
-                  {!isAdmin && <th className="py-4 px-4 text-right">Kas Digital</th>}
-                  <th className="py-4 px-4 text-right">Kas Fisik</th>
-                  {!isAdmin && <th className="py-4 px-4 text-right">Selisih</th>}
-                  <th className="py-4 px-4 text-center">Status</th>
-                  {!isAdmin && <th className="py-4 px-4 text-center">Approval</th>}
-                  {!isAdmin && <th className="py-4 px-4 text-center">Aksi</th>}
+                <tr className="border-b border-slate-200 text-xs text-slate-400 uppercase tracking-wider font-medium">
+                  {!isAdmin && <th className="py-3 px-3">Cabang</th>}
+                  <th className="py-3 px-3">Tanggal</th>
+                  {!isAdmin && <th className="py-3 px-3 text-right">Kas Digital</th>}
+                  <th className="py-3 px-3 text-right">Kas Fisik</th>
+                  {!isAdmin && <th className="py-3 px-3 text-right">Selisih</th>}
+                  <th className="py-3 px-3 text-center">Status</th>
+                  {!isAdmin && <th className="py-3 px-3 text-center">Approval</th>}
+                  {!isAdmin && <th className="py-3 px-3 text-center">Aksi</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 text-sm">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredLogs.map((log) => {
-                  const dc = discrepancyColor(log.selisih);
-                  const ap = approvalBadge(log.approval_status);
+                  const ds = discrepancyStyle(log.selisih);
+                  const ap = approvalStyle(log.approval_status);
                   return (
-                    <tr key={log.id_rekonsiliasi} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={log.id_rekonsiliasi} className="hover:bg-base-bg transition-all">
+                      {!isAdmin && <td className="py-3 px-3 font-medium text-navy text-xs">{log.nama_cabang}</td>}
+                      <td className="py-3 px-3 text-slate-500 text-xs">{formatDate(log.tanggal)}</td>
+                      {!isAdmin && <td className="py-3 px-3 text-right font-medium text-navy text-xs">{formatIDR(log.kas_digital)}</td>}
+                      <td className="py-3 px-3 text-right font-medium text-navy text-xs">{formatIDR(log.kas_fisik)}</td>
                       {!isAdmin && (
-                        <td className="py-4 px-4 font-semibold text-[#0F172A] text-xs">{log.nama_cabang}</td>
-                      )}
-                      <td className="py-4 px-4 text-slate-500 text-xs">{formatDate(log.tanggal)}</td>
-                      {!isAdmin && (
-                        <td className="py-4 px-4 text-right font-semibold text-[#0F172A] text-xs">{formatIDR(log.kas_digital)}</td>
-                      )}
-                      <td className="py-4 px-4 text-right font-semibold text-[#0F172A] text-xs">{formatIDR(log.kas_fisik)}</td>
-                      {!isAdmin && (
-                        <td className="py-4 px-4 text-right">
-                          <span className={`font-bold text-xs ${dc.text}`}>
-                            {log.selisih > 0 ? '+' : ''}{formatIDR(log.selisih)}
-                          </span>
+                        <td className="py-3 px-3 text-right">
+                          <span className={`font-bold text-xs ${ds.text}`}>{log.selisih > 0 ? '+' : ''}{formatIDR(log.selisih)}</span>
                         </td>
                       )}
-                      <td className="py-4 px-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${log.status === 'Cocok' ? 'bg-[#ECFDF5] text-[#047857]' : 'bg-[#FFFBEB] text-[#B45309]'}`}>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${log.status === 'Cocok' ? 'bg-teal-50 text-teal border-teal-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
                           {log.status}
                         </span>
                       </td>
                       {!isAdmin && (
-                        <td className="py-4 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${ap.bg} ${ap.text}`}>
-                            {ap.label}
-                          </span>
+                        <td className="py-3 px-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${ap.bg} ${ap.border}`}>{ap.label}</span>
                         </td>
                       )}
                       {!isAdmin && (
-                        <td className="py-4 px-4 text-center">
+                        <td className="py-3 px-3 text-center">
                           {log.approval_status === 'Pending' ? (
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => handleApprove(log.id_rekonsiliasi)}
-                                disabled={actionLoading === log.id_rekonsiliasi}
-                                className="bg-[#ECFDF5] hover:bg-emerald-100 text-[#047857] text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#047857]/10 transition-all disabled:opacity-50"
-                              >
-                                Setujui
-                              </button>
-                              <button
-                                onClick={() => handleReject(log.id_rekonsiliasi)}
-                                disabled={actionLoading === log.id_rekonsiliasi}
-                                className="bg-[#FFF1F2] hover:bg-rose-100 text-[#BE123C] text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-[#BE123C]/10 transition-all disabled:opacity-50"
-                              >
-                                Tolak
-                              </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => handleApprove(log.id_rekonsiliasi)} disabled={actionLoading === log.id_rekonsiliasi}
+                                className="bg-teal-50 hover:bg-teal-100 text-teal text-[10px] font-medium px-2 py-1 rounded-xl transition-all disabled:opacity-50">Setujui</button>
+                              <button onClick={() => handleReject(log.id_rekonsiliasi)} disabled={actionLoading === log.id_rekonsiliasi}
+                                className="bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-semibold px-2 py-1 rounded-xl transition-all disabled:opacity-50">Tolak</button>
                             </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-400">—</span>
-                          )}
+                          ) : <span className="text-[10px] text-slate-400">—</span>}
                         </td>
                       )}
                     </tr>

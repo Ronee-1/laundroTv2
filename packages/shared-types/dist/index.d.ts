@@ -1,4 +1,4 @@
-export type OrderStatus = 'Pending' | 'Diproses' | 'Siap Diantar' | 'Dalam Pengiriman' | 'Selesai' | 'Lunas' | 'Dibatalkan';
+export type OrderStatus = 'Pending' | 'Diproses' | 'Siap Diantar' | 'Dalam Pengiriman' | 'Selesai' | 'Lunas' | 'Dibatalkan' | 'On Route' | 'Arrived' | 'Done';
 export type TransactionType = 'Pemasukan' | 'Pengeluaran';
 export interface Branch {
     id_cabang: string;
@@ -44,6 +44,12 @@ export interface Order {
     tanggal_selesai?: Date;
     created_at: Date;
     updated_at: Date;
+    customer_name?: string;
+    customer_whatsapp?: string;
+    service_type?: string;
+    wilayah?: string;
+    google_maps_url?: string;
+    source?: 'whatsapp' | 'manual';
 }
 export interface Transaction {
     id_transaksi: string;

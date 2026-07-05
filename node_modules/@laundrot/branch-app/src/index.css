@@ -2,16 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   DEEP LUXURY NAVY & MINT - Global Styles
+   ============================================ */
+
 body {
-  @apply bg-[#F1F5F9] text-[#0F172A] antialiased;
+  @apply bg-[#F4F6F9] text-[#0B192C] antialiased;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 ::selection {
-  background-color: #DBEAFE;
-  color: #1E293B;
+  background-color: #008080;
+  color: #FFFFFF;
 }
 
+/* Remove number spinners */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -20,4 +25,164 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus visible styles - Premium minimal */
+*:focus-visible {
+  outline: 2px solid #008080;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ============================================
+   DESIGN SYSTEM TOKENS
+   ============================================ */
+
+/* Flat Design - No Shadows */
+/* All cards use border instead */
+
+/* Premium Border Classes */
+.border-thin {
+  border-width: 1px;
+  border-color: #E5E7EB;
+}
+
+/* Critical Alert Animation */
+@keyframes blink-critical {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0.6; }
+}
+
+.animate-blink {
+  animation: blink-critical 1.5s ease-in-out infinite;
+}
+
+/* Status Badge Variations */
+.status-aman {
+  @apply bg-teal-50 text-teal border border-teal-200;
+}
+
+.status-menipis {
+  @apply bg-amber-50 text-amber-600 border border-amber-200;
+}
+
+.status-kritis {
+  @apply bg-red-50 text-red-600 border border-red-200;
+}
+
+.status-unaudited {
+  @apply bg-red-50 text-red-600 border border-red-200;
+}
+
+/* Premium Card Component */
+.premium-card {
+  @apply bg-white border border-slate-100 rounded-2xl p-6;
+}
+
+/* Premium Button - Primary */
+.btn-primary {
+  @apply bg-deep-blue text-white px-6 py-3 rounded-2xl font-medium;
+  @apply hover:bg-navy transition-colors duration-200;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Premium Button - Secondary */
+.btn-secondary {
+  @apply bg-white text-navy border border-slate-200 px-6 py-3 rounded-2xl font-medium;
+  @apply hover:border-deep-blue transition-colors duration-200;
+}
+
+/* Premium Button - Accent */
+.btn-accent {
+  @apply bg-teal text-white px-6 py-3 rounded-2xl font-medium;
+  @apply hover:bg-teal-600 transition-colors duration-200;
+}
+
+/* Premium Input */
+.premium-input {
+  @apply w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy;
+  @apply placeholder:text-slate-400 focus:outline-none focus:border-deep-blue transition-colors duration-200;
+}
+
+/* Premium Select */
+.premium-select {
+  @apply w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy;
+  @apply focus:outline-none focus:border-deep-blue transition-colors duration-200 cursor-pointer;
+}
+
+/* Premium Textarea */
+.premium-textarea {
+  @apply w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy;
+  @apply placeholder:text-slate-400 focus:outline-none focus:border-deep-blue transition-colors duration-200 resize-none;
+}
+
+/* Premium Label */
+.premium-label {
+  @apply text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F6F9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ============================================
+   ANIMATION UTILITIES
+   ============================================ */
+
+.transition-smooth {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Pulse animation for critical alerts */
+@keyframes pulse-teal {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-teal {
+  animation: pulse-teal 2s ease-in-out infinite;
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+@media (max-width: 768px) {
+  .premium-card {
+    @apply p-4;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-accent {
+    @apply px-4 py-2.5;
+  }
 }

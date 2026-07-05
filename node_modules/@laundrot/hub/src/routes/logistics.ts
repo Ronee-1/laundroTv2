@@ -16,6 +16,13 @@ import {
 import { restockInventory } from '../services/inventory.js';
 import type { StockCapacity } from '@laundrot/shared-types';
 
+// ==========================================
+// LOGISTICS ROUTES - FR-LOG-02 Core Implementation
+// Admin Cabang men-generate rute harian (batching) yang hanya mengeksekusi
+// daftar pesanan teralokasi di cabangnya sendiri
+// Mendukung: FR-LOG-01 (georouting), FR-INV-01 (inventory monitoring)
+// ==========================================
+
 const router = Router();
 
 interface ErrorResponse {

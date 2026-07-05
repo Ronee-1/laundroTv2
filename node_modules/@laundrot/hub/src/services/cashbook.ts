@@ -1,5 +1,12 @@
 import type { CashBookEntry } from '@laundrot/shared-types';
 
+// ==========================================
+// CASHBOOK SERVICE - FR-FIN-01 Core Implementation
+// Jurnal transaksi otomatis ke Outlet Utama dengan tag cabang asal
+// Seluruh transaksi dari 5 cabang masuk ke database jurnal tunggal
+// Mendukung: FR-FIN-02 (approval), FR-OWN-01 (dashboard)
+// ==========================================
+
 const CASH_BOOK: CashBookEntry[] = [];
 
 export interface CreateJournalParams {

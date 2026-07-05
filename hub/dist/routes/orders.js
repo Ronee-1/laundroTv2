@@ -75,6 +75,112 @@ router.post('/allocate', (req, res) => {
         message: `Pesanan dari "${alamat_pelanggan}" dialokasikan ke ${nearest.branch.nama_cabang} (${Math.round(nearest.distance_km * 100) / 100} km).`,
     });
 });
+router.post('/whatsapp-allocate', (req, res) => {
+    const { customer_name, customer_whatsapp, service_type, wilayah, berat_kg, alamat_penjemputan, google_maps_url, koordinat } = req.body;
+    // Validate required fields
+    if (!customer_name || !customer_whatsapp || !alamat_penjemputan || !koordinat) {
+        res.status(400).json({
+            success: false,
+            error: 'Field wajib: customer_name, customer_whatsapp, alamat_penjemputan, koordinat.',
+        });
+        return;
+    }
+    if (!koordinat || typeof koordinat.latitude !== 'number' || typeof koordinat.longitude !== 'number') {
+        res.status(400).json({
+            success: false,
+            error: 'Koordinat tidak valid. Harus memiliki latitude dan longitude.',
+        });
+        return;
+    }
+    // Find nearest branch using georouting (FR-LOG-01)
+    const nearest = (0, georouting_js_1.findNearestBranch)(koordinat);
+    if (!nearest) {
+        res.status(400).json({
+            success: false,
+            error: 'Tidak ada cabang aktif yang tersedia untuk dialokasikan.',
+        });
+        return;
+    }
+    // Check quota availability
+    const quota = (0, quota_js_1.checkQuota)(nearest.branch.id_cabang);
+    if (quota && !quota.available) {
+        res.status(200).json({
+            success: false,
+            error: 'Kuota harian cabang telah penuh.',
+            id_cabang: nearest.branch.id_cabang,
+            nama_cabang: nearest.branch.nama_cabang,
+        });
+        return;
+    }
+    // Create order in the nearest branch (FR-LOG-02 - branch receives order)
+    const order = (0, orders_js_1.createOrderFromWhatsApp)({
+        id_cabang: nearest.branch.id_cabang,
+        customer_name,
+        customer_whatsapp,
+        service_type: service_type || 'Laundry Kiloan',
+        berat_kg: berat_kg || 0,
+        wilayah,
+        alamat_penjemputan,
+        koordinat_penjemputan: koordinat,
+        google_maps_url: google_maps_url || '',
+    });
+    const branch = (0, branches_js_1.getBranchById)(nearest.branch.id_cabang);
+    // Return success with order details - branch admin will see this in their dashboard
+    res.status(201).json({
+        success: true,
+        id_order: order.id_order,
+        id_cabang: nearest.branch.id_cabang,
+        nama_cabang: branch?.nama_cabang ?? nearest.branch.nama_cabang,
+        distance_km: Math.round(nearest.distance_km * 100) / 100,
+        message: `Pesanan dari ${customer_name} berhasil dialokasikan ke ${branch?.nama_cabang ?? nearest.branch.nama_cabang}. Order ID: ${order.id_order}`,
+    });
+});
+router.get('/branch/:id_cabang/incoming', (req, res) => {
+    const { id_cabang } = req.params;
+    const branch = (0, branches_js_1.getBranchById)(id_cabang);
+    if (!branch) {
+        res.status(404).json({
+            success: false,
+            error: `Cabang "${id_cabang}" tidak ditemukan.`,
+        });
+        return;
+    }
+    const incomingOrders = (0, orders_js_1.getIncomingOrdersByBranch)(id_cabang);
+    res.status(200).json({
+        success: true,
+        id_cabang,
+        total_orders: incomingOrders.length,
+        orders: incomingOrders.map((o) => ({
+            id_order: o.id_order,
+            customer_name: o.customer_name ?? 'Unknown',
+            customer_whatsapp: o.customer_whatsapp ?? '',
+            service_type: o.service_type ?? 'Laundry Kiloan',
+            wilayah: o.wilayah ?? '',
+            berat_kg: o.berat_kg ?? 0,
+            alamat_penjemputan: o.alamat_penjemputan,
+            google_maps_url: o.google_maps_url ?? '',
+            koordinat_penjemputan: o.koordinat_penjemputan,
+            status: o.status,
+            tanggal_order: o.tanggal_order.toISOString(),
+        })),
+    });
+});
+// Get all orders for branch (including processed)
+router.get('/branch/:id_cabang/all', (req, res) => {
+    const { id_cabang } = req.params;
+    const branch = (0, branches_js_1.getBranchById)(id_cabang);
+    if (!branch) {
+        res.status(404).json({ success: false, error: `Cabang "${id_cabang}" tidak ditemukan.` });
+        return;
+    }
+    const orders = (0, orders_js_1.getAllOrdersByBranch)(id_cabang);
+    res.status(200).json({
+        success: true,
+        id_cabang,
+        total_orders: orders.length,
+        orders,
+    });
+});
 const VALID_STATUSES = [
     'Pending',
     'Diproses',
@@ -83,6 +189,9 @@ const VALID_STATUSES = [
     'Selesai',
     'Lunas',
     'Dibatalkan',
+    'On Route',
+    'Arrived',
+    'Done',
 ];
 router.patch('/:id_order/status', (req, res) => {
     const { id_order } = req.params;
@@ -109,7 +218,7 @@ router.patch('/:id_order/status', (req, res) => {
         return;
     }
     let journal = undefined;
-    if (status === 'Selesai' || status === 'Lunas') {
+    if (status === 'Selesai' || status === 'Lunas' || status === 'Done') {
         const branch = (0, branches_js_1.getBranchById)(updatedOrder.id_cabang);
         const nominal = updatedOrder.total_harga ?? 0;
         const entry = (0, cashbook_js_1.createJournalEntry)({

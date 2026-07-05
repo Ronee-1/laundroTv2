@@ -1,4 +1,10 @@
 "use strict";
+// ==========================================
+// EXPENSE SERVICE - FR-FIN-08 Core Implementation
+// Formulir input pengeluaran operasional harian
+// (tanggal, nominal, kategori kustom, bukti nota)
+// Extends: FR-FIN-02 (approval), FR-FIN-03 (overbudget)
+// ==========================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_CATEGORIES = void 0;
 exports.getCategories = getCategories;
