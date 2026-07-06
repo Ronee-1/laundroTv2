@@ -30,17 +30,24 @@ interface RestockRequestResponse {
   message: string;
 }
 
+interface RestockRequestErrorResponse {
+  success: false;
+  error: string;
+}
+
+type RestockRequestResult = RestockRequestResponse | RestockRequestErrorResponse;
+
 router.post(
   '/request',
-  (req: Request<Record<string, never>, RestockRequestResponse, RestockRequestBody>,
-  res: Response<RestockRequestResponse>
+  (req: Request<Record<string, never>, RestockRequestResult, RestockRequestBody>,
+  res: Response<RestockRequestResult>
 ) => {
   const { id_cabang } = req.query as { id_cabang?: string };
   const { detergen, pelembut, plastik, catatan } = req.body;
 
   if (!id_cabang) {
     res.status(400).json({
-      success: false as any,
+      success: false,
       error: 'id_cabang wajib ada di query parameter',
     });
     return;
@@ -49,7 +56,7 @@ router.post(
   const branch = getBranchById(id_cabang);
   if (!branch) {
     res.status(404).json({
-      success: false as any,
+      success: false,
       error: `Cabang "${id_cabang}" tidak ditemukan.`,
     });
     return;

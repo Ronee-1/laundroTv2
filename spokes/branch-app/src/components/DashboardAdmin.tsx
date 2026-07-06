@@ -8,7 +8,7 @@
 // Peringatan 24 jam: Banner jika data stok belum diperbarui
 // ==========================================
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { UserRole } from '../App.tsx';
 import { RestockModal } from './RestockModal.tsx';
 
@@ -62,24 +62,106 @@ function formatIDR(num: number): string {
   }).format(num);
 }
 
-const MOCK_BRANCH_DATA: BranchData = {
-  id_cabang: 'CBG-002',
-  nama_cabang: 'Jakarta Selatan',
-  budget: {
-    pagu_anggaran: 22500000,
-    terpakai: 16200000,
-    sisa_pagu: 6300000,
-    utilization_percent: 72,
-    daily_average: 540000,
+const MOCK_BRANCH_DATA_MAP: Record<string, BranchData> = {
+  'CBG-001': {
+    id_cabang: 'CBG-001',
+    nama_cabang: 'Depok (Pusat)',
+    budget: {
+      pagu_anggaran: 5000000,
+      terpakai: 350000,
+      sisa_pagu: 4650000,
+      utilization_percent: 7,
+      daily_average: 50000,
+    },
+    inventory: {
+      stocks: [
+        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 85, safety_threshold: 50, max_capacity: 100, status: 'Aman' },
+        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 62, safety_threshold: 50, max_capacity: 80, status: 'Aman' },
+        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 380, safety_threshold: 100, max_capacity: 500, status: 'Aman' },
+      ],
+      overall_status: 'Aman',
+      last_updated: new Date().toISOString(),
+    },
   },
-  inventory: {
-    stocks: [
-      { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 12, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
-      { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 4, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
-      { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 450, safety_threshold: 100, max_capacity: 500, status: 'Aman' },
-    ],
-    overall_status: 'Kritis',
-    last_updated: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+  'CBG-002': {
+    id_cabang: 'CBG-002',
+    nama_cabang: 'Jakarta Selatan',
+    budget: {
+      pagu_anggaran: 5000000,
+      terpakai: 2300000,
+      sisa_pagu: 2700000,
+      utilization_percent: 46,
+      daily_average: 328571,
+    },
+    inventory: {
+      stocks: [
+        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 12, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
+        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 4, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
+        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 450, safety_threshold: 100, max_capacity: 500, status: 'Aman' },
+      ],
+      overall_status: 'Kritis',
+      last_updated: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+    },
+  },
+  'CBG-003': {
+    id_cabang: 'CBG-003',
+    nama_cabang: 'Bekasi Timur',
+    budget: {
+      pagu_anggaran: 4000000,
+      terpakai: 1200000,
+      sisa_pagu: 2800000,
+      utilization_percent: 30,
+      daily_average: 171429,
+    },
+    inventory: {
+      stocks: [
+        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 42, safety_threshold: 50, max_capacity: 100, status: 'Menipis' },
+        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 55, safety_threshold: 50, max_capacity: 80, status: 'Aman' },
+        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 210, safety_threshold: 100, max_capacity: 500, status: 'Aman' },
+      ],
+      overall_status: 'Menipis',
+      last_updated: new Date().toISOString(),
+    },
+  },
+  'CBG-004': {
+    id_cabang: 'CBG-004',
+    nama_cabang: 'Tangerang Kota',
+    budget: {
+      pagu_anggaran: 4500000,
+      terpakai: 2800000,
+      sisa_pagu: 1700000,
+      utilization_percent: 62,
+      daily_average: 400000,
+    },
+    inventory: {
+      stocks: [
+        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 68, safety_threshold: 50, max_capacity: 100, status: 'Aman' },
+        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 38, safety_threshold: 50, max_capacity: 80, status: 'Menipis' },
+        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 150, safety_threshold: 100, max_capacity: 500, status: 'Aman' },
+      ],
+      overall_status: 'Menipis',
+      last_updated: new Date().toISOString(),
+    },
+  },
+  'CBG-005': {
+    id_cabang: 'CBG-005',
+    nama_cabang: 'Bogor Raya',
+    budget: {
+      pagu_anggaran: 4000000,
+      terpakai: 3850000,
+      sisa_pagu: 150000,
+      utilization_percent: 96,
+      daily_average: 550000,
+    },
+    inventory: {
+      stocks: [
+        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 8, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
+        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 15, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
+        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 88, safety_threshold: 100, max_capacity: 500, status: 'Menipis' },
+      ],
+      overall_status: 'Kritis',
+      last_updated: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    },
   },
 };
 
@@ -108,7 +190,10 @@ function getStatusBadgeStyle(status: string) {
 }
 
 export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotification }: Props) {
-  const [branchData] = useState<BranchData>(MOCK_BRANCH_DATA);
+  const branchData = useMemo<BranchData>(
+    () => MOCK_BRANCH_DATA_MAP[selectedAdminBranch] ?? MOCK_BRANCH_DATA_MAP['CBG-002']!,
+    [selectedAdminBranch]
+  );
   const [couriers] = useState<Courier[]>(MOCK_COURIERS);
   const [showRestockModal, setShowRestockModal] = useState(false);
 

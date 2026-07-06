@@ -54,14 +54,17 @@ router.get('/dashboard', (_req, res) => {
         const total_pemasukan = branchJournals
             .filter((j) => j.tipe === 'Pemasukan')
             .reduce((sum, j) => sum + j.nominal, 0);
+        const effective_pemasukan = Math.max(total_pemasukan, branch.omzet);
         const total_pengeluaran_from_journal = branchJournals
             .filter((j) => j.tipe === 'Pengeluaran')
             .reduce((sum, j) => sum + j.nominal, 0);
         const total_approved_expenses = (0, expense_js_1.getTotalApprovedExpenses)(branch.id_cabang);
-        const total_pengeluaran = total_pengeluaran_from_journal > 0 ? total_pengeluaran_from_journal : total_approved_expenses;
         const budget = (0, budget_js_1.getBudget)(branch.id_cabang);
         const pagu_anggaran = budget?.pagu_anggaran ?? 0;
         const terpakai = budget?.terpakai ?? 0;
+        const total_pengeluaran = total_pengeluaran_from_journal > 0
+            ? total_pengeluaran_from_journal
+            : Math.max(total_approved_expenses, terpakai);
         const sisa_pagu = pagu_anggaran - terpakai;
         const utilization_percent = pagu_anggaran > 0 ? (terpakai / pagu_anggaran) * 100 : 0;
         const rounded_utilization = Math.round(utilization_percent * 100) / 100;
@@ -77,7 +80,7 @@ router.get('/dashboard', (_req, res) => {
             id_cabang: branch.id_cabang,
             nama_cabang: branch.nama_cabang,
             wilayah: branch.wilayah,
-            total_pemasukan,
+            total_pemasukan: effective_pemasukan,
             total_pengeluaran,
             omzet: branch.omzet,
             saldo: branch.omzet - total_pengeluaran,
