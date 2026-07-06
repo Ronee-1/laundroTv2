@@ -263,6 +263,26 @@ router.post('/:id_cabang/adjust', (req, res) => {
         message: 'Penyesuaian stok berhasil disimpan dan dicatat sebagai anomali.',
     });
 });
+router.get('/:id_cabang/daily-summary', (req, res) => {
+    const { id_cabang } = req.params;
+    const branch = (0, branches_js_1.getBranchById)(id_cabang);
+    if (!branch) {
+        res.status(404).json({ success: false, error: `Cabang dengan ID "${id_cabang}" tidak ditemukan.` });
+        return;
+    }
+    // Calculate from approved expenses
+    const total_pengeluaran = (0, expense_js_1.getTotalApprovedExpenses)(id_cabang);
+    const total_pemasukan = branch.omzet * 0.7; // Mock: 70% of omzet as today's income
+    const sisa_kas = total_pemasukan - total_pengeluaran;
+    res.status(200).json({
+        success: true,
+        id_cabang,
+        total_pemasukan,
+        total_pengeluaran,
+        sisa_kas,
+        transaction_count: Math.floor(Math.random() * 20) + 5, // Mock transaction count
+    });
+});
 const CUSTOMERS = [];
 let nextCustomerId = 1;
 router.post('/:id_cabang/customer', (req, res) => {

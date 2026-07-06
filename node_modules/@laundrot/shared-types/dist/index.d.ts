@@ -50,6 +50,8 @@ export interface Order {
     wilayah?: string;
     google_maps_url?: string;
     source?: 'whatsapp' | 'manual';
+    assigned_by?: string;
+    assigned_at?: Date;
 }
 export interface Transaction {
     id_transaksi: string;

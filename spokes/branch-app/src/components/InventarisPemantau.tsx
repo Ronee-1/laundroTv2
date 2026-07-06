@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { UserRole } from '../App.tsx';
+import { RestockApproval } from './RestockApproval.tsx';
+import { RestockRequestModal } from './RestockRequestModal.tsx';
 import { RestockModal } from './RestockModal.tsx';
 
 interface StockEntry {
@@ -50,8 +52,8 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRestockRequestModal, setShowRestockRequestModal] = useState(false);
   const [showRestockModal, setShowRestockModal] = useState(false);
-  const [restockBranchId, setRestockBranchId] = useState('CBG-002');
   const [inTransitLogs, setInTransitLogs] = useState<InTransitLog[]>([]);
   const [showVerifyForm, setShowVerifyForm] = useState(false);
   const [verifyLogId, setVerifyLogId] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
   const [verifying, setVerifying] = useState(false);
 
   const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showApprovalPanel, setShowApprovalPanel] = useState(false);
   const [adjustForm, setAdjustForm] = useState({ item: 'Detergen' as 'Detergen' | 'Pelembut' | 'Plastik', stok_baru: '', alasan: '' });
   const [adjusting, setAdjusting] = useState(false);
 
@@ -223,10 +226,24 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
               ⚠️ Penyesuaian Stok
             </button>
           )}
-          <button onClick={() => { setRestockBranchId(selectedAdminBranch); setShowRestockModal(true); }}
-            className="bg-deep-blue text-white px-4 py-2 rounded-2xl text-sm font-medium hover:bg-navy transition-all">
-            + Restock
-          </button>
+          {userRole === 'Admin Cabang' && (
+            <button onClick={() => setShowRestockRequestModal(true)}
+              className="bg-deep-blue text-white px-4 py-2 rounded-2xl text-sm font-medium hover:bg-navy transition-all">
+              + Ajukan Restok
+            </button>
+          )}
+          {userRole === 'Owner' && (
+            <>
+              <button onClick={() => setShowApprovalPanel(true)}
+                className="bg-amber-50 text-amber-600 border border-amber-200 px-4 py-2 rounded-2xl text-sm font-medium hover:bg-amber-100 transition-all">
+                📋 Konfirmasi Restok
+              </button>
+              <button onClick={() => setShowRestockModal(true)}
+                className="bg-deep-blue text-white px-4 py-2 rounded-2xl text-sm font-medium hover:bg-navy transition-all">
+                ⚡ Restok Langsung
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -432,17 +449,52 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
         </div>
       )}
 
-      {/* Restock Modal */}
+      {/* Admin Restock Request Modal - Creates Pending Request */}
+      {showRestockRequestModal && (
+        <RestockRequestModal
+          selectedAdminBranch={selectedAdminBranch}
+          onClose={() => setShowRestockRequestModal(false)}
+          onSuccess={(msg) => triggerNotification(msg, 'success')}
+        />
+      )}
+
+      {/* Owner Direct Restock Modal - Adds stock directly without approval */}
       {showRestockModal && (
         <RestockModal
           branches={data.per_cabang.map((b) => ({ id: b.id_cabang, nama: b.nama_cabang }))}
-          initialBranchId={restockBranchId}
+          initialBranchId={data.per_cabang[0]?.id_cabang ?? 'CBG-001'}
           userRole={userRole}
           selectedAdminBranch={selectedAdminBranch}
           onClose={() => setShowRestockModal(false)}
-          onSuccess={(msg) => triggerNotification(msg, 'success')}
+          onSuccess={(msg) => {
+            triggerNotification(msg, 'success');
+            setShowRestockModal(false);
+          }}
         />
+      )}
+
+      {/* Owner Approval Panel - Approve/Reject Admin Restock Requests */}
+      {showApprovalPanel && (
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+            <div className="p-5 border-b border-slate-200 flex justify-between items-start">
+              <div>
+                <h3 className="text-base font-bold text-navy">📋 Konfirmasi Pengajuan Restok</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Setujui atau tolak pengajuan dari Admin Cabang</p>
+              </div>
+              <button onClick={() => setShowApprovalPanel(false)} className="text-slate-400 hover:text-navy">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <RestockApproval
+                onRestockSuccess={(msg) => triggerNotification(msg, 'success')}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+

@@ -8,82 +8,159 @@ export default {
     extend: {
       colors: {
         // ============================================
-        // DEEP LUXURY NAVY & MINT PALETTE
+        // MATERIAL DESIGN 3 COLOR SYSTEM
+        // Based on Material You Design Language
         // ============================================
 
-        // Primary Text & Structural Headers: #0B192C
-        'navy': {
-          DEFAULT: '#0B192C',
-          50: '#E6EBF0',
-          100: '#CCD7E1',
-          200: '#99AFC3',
-          300: '#6687A5',
-          400: '#335F87',
-          500: '#1E3E62',
-          600: '#0B192C',
-          700: '#091422',
-          800: '#070F19',
-          900: '#050A10',
+        // Primary - Deep Indigo
+        'md-primary': {
+          DEFAULT: '#15157d',
+          50: '#e8e8fc',
+          100: '#c0c1ff',
+          200: '#9999fe',
+          300: '#7272fe',
+          400: '#4f54b4',
+          500: '#2e3192',
+          600: '#15157d',
+          700: '#0f1063',
+          800: '#0a0a4a',
+          900: '#050530',
         },
 
-        // Secondary / Action Elements: #1E3E62
-        'deep-blue': {
-          DEFAULT: '#1E3E62',
-          50: '#E8ECF1',
-          100: '#D1D9E3',
-          200: '#A3B3C7',
-          300: '#758DAB',
-          400: '#47678F',
-          500: '#1E3E62',
-          600: '#183254',
-          700: '#122546',
-          800: '#0C1838',
-          900: '#060B1A',
+        // Secondary - Vibrant Blue
+        'md-secondary': {
+          DEFAULT: '#0056c6',
+          50: '#e6f0ff',
+          100: '#b0c6ff',
+          200: '#7a9bff',
+          300: '#4471ff',
+          400: '#2e55cc',
+          500: '#1e3d99',
+          600: '#152966',
+          700: '#0d1533',
+          800: '#04000f',
         },
 
-        // Accent / Success Indicators: #008080 (Teal/Mint Tua)
+        // Tertiary - Deep Purple
+        'md-tertiary': {
+          DEFAULT: '#0c0092',
+          50: '#e6e0ff',
+          100: '#c0bfff',
+          200: '#9999ff',
+          300: '#7373fe',
+          400: '#5252cc',
+          500: '#373799',
+          600: '#1f1f66',
+          700: '#0a0a33',
+        },
+
+        // Surface Colors
+        'md-surface': '#f8f9ff',
+        'md-surface-container': '#e5eeff',
+        'md-surface-container-low': '#eff4ff',
+        'md-surface-container-high': '#dce9ff',
+        'md-surface-container-highest': '#d3e4fe',
+
+        // On Colors (text on surface)
+        'md-on-surface': '#0b1c30',
+        'md-on-surface-variant': '#464652',
+
+        // On Primary
+        'md-on-primary': '#ffffff',
+
+        // Outline Colors
+        'md-outline': '#777683',
+        'md-outline-variant': '#c7c5d4',
+
+        // Error Colors
+        'md-error': '#ba1a1a',
+        'md-error-container': '#ffdad6',
+        'md-on-error': '#ffffff',
+        'md-on-error-container': '#93000a',
+
+        // Success (Teal)
+        'md-success': '#0d9488',
+        'md-success-light': '#ccfbf1',
+
+        // Warning (Amber)
+        'md-warning': '#d97706',
+        'md-warning-light': '#fef3c7',
+
+        // Extended Teal
         'teal': {
-          DEFAULT: '#008080',
-          50: '#E6F5F5',
-          100: '#CCEEEE',
-          200: '#99DDDD',
-          300: '#66CCCC',
-          400: '#33BBBB',
-          500: '#008080',
-          600: '#006666',
-          700: '#004D4D',
-          800: '#003333',
-          900: '#001A1A',
+          DEFAULT: '#14b8a6',
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
         },
 
-        // Background Base: #F4F6F9
-        'base-bg': '#F4F6F9',
+        // Navy (legacy support)
+        'navy': {
+          DEFAULT: '#15157d',
+          50: '#e8e8fc',
+          100: '#c0c1ff',
+          200: '#9999fe',
+          300: '#7272fe',
+          400: '#4f54b4',
+          500: '#2e3192',
+          600: '#15157d',
+          700: '#0f1063',
+          800: '#0a0a4a',
+          900: '#050530',
+        },
 
-        // Containers / Cards Surface: #FFFFFF
-        'card': '#FFFFFF',
+        // Deep Blue (legacy support)
+        'deep-blue': {
+          DEFAULT: '#0056c6',
+          50: '#e6f0ff',
+          100: '#b0c6ff',
+          200: '#7a9bff',
+          300: '#4471ff',
+          400: '#2e55cc',
+          500: '#1e3d99',
+          600: '#152966',
+          700: '#0d1533',
+          800: '#04000f',
+        },
+
+        // Background Base
+        'base-bg': '#f8f9ff',
+
+        // Containers / Cards Surface
+        'card': '#ffffff',
 
         // Border Colors
-        'border-light': '#E5E7EB',
-        'border-slate': '#E2E8F0',
+        'border-light': '#e5e7eb',
+        'border-slate': '#c7c5d4',
 
         // Text Colors
-        'text-primary': '#0B192C',
-        'text-secondary': '#475569',
-        'text-muted': '#94A3B8',
+        'text-primary': '#0b1c30',
+        'text-secondary': '#464652',
+        'text-muted': '#94a3b8',
 
-        // Status Colors - Redesigned with new palette
-        'success': '#008080',
-        'success-bg': '#E6F5F5',
-        'warning': '#D97706',
-        'warning-bg': '#FFFBEB',
-        'danger': '#DC2626',
-        'danger-bg': '#FEF2F2',
+        // Status Colors
+        'success': '#0d9488',
+        'success-bg': '#ccfbf1',
+        'warning': '#d97706',
+        'warning-bg': '#fef3c7',
+        'danger': '#ba1a1a',
+        'danger-bg': '#ffdad6',
 
         // Brand Colors
         'brand': {
-          primary: '#1E3E62',
-          accent: '#008080',
+          primary: '#15157d',
+          accent: '#14b8a6',
         },
+      },
+      fontFamily: {
+        'sans': ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
       },
       borderRadius: {
         'none': '0px',
@@ -98,15 +175,21 @@ export default {
         'full': '9999px',
       },
       boxShadow: {
-        // NO SHADOWS - Flat Premium Design
-        // All elements use border-thin separators instead
+        'md': '0 2px 8px rgba(21, 21, 125, 0.08)',
+        'lg': '0 4px 16px rgba(21, 21, 125, 0.12)',
+        'xl': '0 8px 32px rgba(21, 21, 125, 0.16)',
+        'card': '0 2px 12px rgba(21, 21, 125, 0.06)',
       },
       spacing: {
         '18': '4.5rem',
         '22': '5.5rem',
+        'gutter': '24px',
       },
       borderWidth: {
         'thin': '1px',
+      },
+      animation: {
+        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
       },
     },
   },

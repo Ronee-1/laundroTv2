@@ -2,9 +2,18 @@ import { Router, type Request, type Response } from 'express';
 import type { OrderStatus } from '@laundrot/shared-types';
 import { findNearestBranch } from '../services/georouting.js';
 import { checkQuota, generateDelayMessage, getNextBusinessDay } from '../services/quota.js';
-import { updateOrderStatus, createOrderFromWhatsApp, getIncomingOrdersByBranch, getAllOrdersByBranch } from '../config/orders.js';
+import {
+  updateOrderStatus,
+  createOrderFromWhatsApp,
+  getIncomingOrdersByBranch,
+  getAllOrdersByBranch,
+  assignOrderToCourier,
+  getAssignedOrdersByCourier,
+  reorderCourierTasks,
+} from '../config/orders.js';
 import { createJournalEntry } from '../services/cashbook.js';
 import { getBranchById } from '../config/branches.js';
+import { getCourierById } from '../config/couriers.js';
 
 const router = Router();
 
@@ -323,6 +332,193 @@ router.get(
       id_cabang,
       total_orders: orders.length,
       orders,
+    });
+  },
+);
+
+// ==========================================
+// FR-005: Assign Order to Courier
+// Assigns a specific order to a courier for pickup/delivery
+// Admin can plot task sequence manually
+// ==========================================
+interface AssignOrderBody {
+  id_kurir: string;
+  assigned_by?: string;
+}
+
+interface AssignOrderSuccessResponse {
+  success: true;
+  id_order: string;
+  id_kurir: string;
+  nama_kurir: string;
+  message: string;
+}
+
+interface AssignOrderErrorResponse {
+  success: false;
+  error: string;
+}
+
+type AssignOrderResponse = AssignOrderSuccessResponse | AssignOrderErrorResponse;
+
+router.patch(
+  '/:id_order/assign',
+  (req: Request<{ id_order: string }, AssignOrderResponse, AssignOrderBody>, res: Response<AssignOrderResponse>) => {
+    const { id_order } = req.params;
+    const { id_kurir, assigned_by } = req.body;
+
+    if (!id_kurir) {
+      res.status(400).json({
+        success: false,
+        error: 'id_kurir wajib diisi.',
+      });
+      return;
+    }
+
+    const order = getAllOrdersByBranch('').find((o) => o.id_order === id_order);
+    if (!order) {
+      res.status(404).json({
+        success: false,
+        error: `Pesanan dengan ID "${id_order}" tidak ditemukan.`,
+      });
+      return;
+    }
+
+    // Verify courier exists
+    const courier = getCourierById(id_kurir);
+    if (!courier) {
+      res.status(404).json({
+        success: false,
+        error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+      });
+      return;
+    }
+
+    // Verify courier belongs to the same branch as the order
+    if (courier.id_cabang !== order.id_cabang) {
+      res.status(400).json({
+        success: false,
+        error: `Kurir ${id_kurir} tidak bertugas di cabang ${order.id_cabang}. Kurir hanya bisa menerima pesanan dari cabangnya sendiri.`,
+      });
+      return;
+    }
+
+    const updatedOrder = assignOrderToCourier(id_order, id_kurir, assigned_by);
+
+    if (!updatedOrder) {
+      res.status(404).json({
+        success: false,
+        error: `Gagal assigning order: Pesanan tidak ditemukan.`,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      id_order: updatedOrder.id_order,
+      id_kurir: updatedOrder.id_kurir ?? id_kurir,
+      nama_kurir: courier.nama_kurir,
+      message: `Pesanan ${id_order} berhasil dialokasikan ke kurir ${courier.nama_kurir} (${id_kurir}).`,
+    });
+  },
+);
+
+// ==========================================
+// FR-005: Reorder Courier Tasks
+// Allows Admin to manually plot/sequence the order of courier tasks
+// ==========================================
+interface ReorderTasksBody {
+  id_kurir: string;
+  ordered_task_ids: string[];
+}
+
+interface ReorderTasksSuccessResponse {
+  success: true;
+  id_kurir: string;
+  nama_kurir: string;
+  sequences: Array<{
+    id_order: string;
+    urutan: number;
+  }>;
+  message: string;
+}
+
+type ReorderTasksResponse = ReorderTasksSuccessResponse | AssignOrderErrorResponse;
+
+router.put(
+  '/reorder-tasks',
+  (req: Request<{}, ReorderTasksResponse, ReorderTasksBody>, res: Response<ReorderTasksResponse>) => {
+    const { id_kurir, ordered_task_ids } = req.body;
+
+    if (!id_kurir || !ordered_task_ids || !Array.isArray(ordered_task_ids)) {
+      res.status(400).json({
+        success: false,
+        error: 'id_kurir dan ordered_task_ids (array) wajib diisi.',
+      });
+      return;
+    }
+
+    const courier = getCourierById(id_kurir);
+    if (!courier) {
+      res.status(404).json({
+        success: false,
+        error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+      });
+      return;
+    }
+
+    const sequences = reorderCourierTasks(id_kurir, ordered_task_ids);
+
+    res.status(200).json({
+      success: true,
+      id_kurir,
+      nama_kurir: courier.nama_kurir,
+      sequences: sequences.map((s) => ({ id_order: s.id_order, urutan: s.urutan })),
+      message: `Urutan tugas kurir ${courier.nama_kurir} berhasil diplot ulang. Total: ${sequences.length} tugas.`,
+    });
+  },
+);
+
+// ==========================================
+// FR-005: Get Courier Tasks with Sequence
+// Returns tasks in their manually plotted sequence
+// ==========================================
+router.get(
+  '/courier/:id_kurir/sequence',
+  (req: Request<{ id_kurir: string }, any>, res: Response) => {
+    const { id_kurir } = req.params;
+
+    const courier = getCourierById(id_kurir);
+    if (!courier) {
+      res.status(404).json({
+        success: false,
+        error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+      });
+      return;
+    }
+
+    const { orders, sequences } = getAssignedOrdersByCourier(id_kurir);
+
+    res.status(200).json({
+      success: true,
+      id_kurir,
+      nama_kurir: courier.nama_kurir,
+      id_cabang: courier.id_cabang,
+      total_tugas: orders.length,
+      sequences: sequences.map((s) => ({
+        id_order: s.id_order,
+        urutan: s.urutan,
+        alamat_penjemputan: s.alamat_penjemputan,
+        status: s.status,
+        berat_kg: s.berat_kg,
+        assigned_at: s.assigned_at?.toISOString(),
+      })),
+      orders: orders.map((o) => ({
+        id_order: o.id_order,
+        alamat_penjemputan: o.alamat_penjemputan,
+        status: o.status,
+        berat_kg: o.berat_kg,
+      })),
     });
   },
 );

@@ -1,9 +1,10 @@
 import type { Order, OrderStatus } from '@laundrot/shared-types';
 
 // ==========================================
-// ORDERS CONFIG - FR-LOG-01, FR-LOG-02 Integration
+// ORDERS CONFIG - FR-LOG-01, FR-LOG-02, FR-005 Integration
 // WhatsApp Order Hub allocates orders to nearest branch
 // Branch admin receives allocated orders for batch processing
+// FR-005: Admin can assign orders to couriers with task ordering
 // ==========================================
 
 export const ORDERS: Order[] = [
@@ -149,4 +150,109 @@ export function getIncomingOrdersByBranch(id_cabang: string): Order[] {
 // Get all orders for branch (including processed)
 export function getAllOrdersByBranch(id_cabang: string): Order[] {
   return ORDERS.filter((o) => o.id_cabang === id_cabang);
+}
+
+// ==========================================
+// FR-005: Assign Order to Courier
+// Assigns an order to a specific courier for pickup/delivery
+// ==========================================
+export function assignOrderToCourier(
+  id_order: string,
+  id_kurir: string,
+  assigned_by?: string
+): Order | null {
+  const order = getOrderById(id_order);
+  if (!order) return null;
+
+  order.id_kurir = id_kurir;
+  order.assigned_by = assigned_by;
+  order.assigned_at = new Date();
+  order.updated_at = new Date();
+
+  return order;
+}
+
+// ==========================================
+// FR-005: Get Courier Task Sequence
+// Returns tasks for a courier with manual ordering applied
+// ==========================================
+export interface CourierTaskSequence {
+  id_order: string;
+  urutan: number;
+  id_kurir: string;
+  alamat_penjemputan: string;
+  status: string;
+  berat_kg?: number;
+  assigned_at?: Date;
+}
+
+// Manual task ordering storage
+const TASK_SEQUENCES: Map<string, CourierTaskSequence[]> = new Map();
+
+export function getCourierTaskSequence(id_kurir: string): CourierTaskSequence[] {
+  return TASK_SEQUENCES.get(id_kurir) || [];
+}
+
+export function setCourierTaskSequence(
+  id_kurir: string,
+  sequences: CourierTaskSequence[]
+): void {
+  TASK_SEQUENCES.set(id_kurir, sequences);
+}
+
+export function reorderCourierTasks(
+  id_kurir: string,
+  orderedTaskIds: string[]
+): CourierTaskSequence[] {
+  const orders = ORDERS.filter((o) => o.id_kurir === id_kurir);
+
+  const sequences: CourierTaskSequence[] = [];
+  orderedTaskIds.forEach((id_order, index) => {
+    const order = orders.find((o) => o.id_order === id_order);
+    if (order) {
+      sequences.push({
+        id_order: order.id_order,
+        urutan: index + 1,
+        id_kurir: id_kurir,
+        alamat_penjemputan: order.alamat_penjemputan,
+        status: order.status as string,
+        berat_kg: order.berat_kg,
+        assigned_at: order.assigned_at,
+      });
+    }
+  });
+
+  TASK_SEQUENCES.set(id_kurir, sequences);
+  return sequences;
+}
+
+// ==========================================
+// FR-005: Get Orders Assigned to Courier (with sequence)
+// Returns orders in their manually plotted sequence
+// ==========================================
+export function getAssignedOrdersByCourier(id_kurir: string): {
+  orders: Order[];
+  sequences: CourierTaskSequence[];
+} {
+  const orders = ORDERS.filter((o) => o.id_kurir === id_kurir && o.status !== 'Done' && o.status !== 'Dibatalkan');
+  const sequences = getCourierTaskSequence(id_kurir);
+
+  // Sort orders by sequence if exists, otherwise by assignment date
+  const orderedOrders = [...orders].sort((a, b) => {
+    const seqA = sequences.find((s) => s.id_order === a.id_order);
+    const seqB = sequences.find((s) => s.id_order === b.id_order);
+
+    if (seqA && seqB) {
+      return seqA.urutan - seqB.urutan;
+    }
+    if (seqA) return -1;
+    if (seqB) return 1;
+
+    // Fallback: sort by assigned_at
+    const dateA = a.assigned_at?.getTime() || 0;
+    const dateB = b.assigned_at?.getTime() || 0;
+    return dateA - dateB;
+  });
+
+  return { orders: orderedOrders, sequences };
 }

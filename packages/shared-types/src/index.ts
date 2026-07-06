@@ -65,6 +65,9 @@ export interface Order {
   wilayah?: string;
   google_maps_url?: string;
   source?: 'whatsapp' | 'manual';
+  // FR-005: Courier Assignment fields
+  assigned_by?: string;
+  assigned_at?: Date;
 }
 
 export interface Transaction {

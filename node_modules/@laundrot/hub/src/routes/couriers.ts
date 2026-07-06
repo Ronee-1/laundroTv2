@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from 'express';
 import { getCourierById, getCouriersByBranch } from '../config/couriers.js';
-import { getOrdersByCourier } from '../config/orders.js';
+import { getOrdersByCourier, getAssignedOrdersByCourier } from '../config/orders.js';
 
 // ==========================================
-// COURIERS ROUTES - FR-LOG-03 Implementation
+// COURIERS ROUTES - FR-LOG-03, FR-005 Implementation
 // Courier task management and branch courier listing
+// FR-005: Admin can assign orders to couriers and plot task sequence
 // ==========================================
 
 const router = Router();
@@ -15,6 +16,7 @@ interface CourierTaskResponse {
   nama_kurir: string;
   id_cabang: string;
   total_tugas: number;
+  urutan_tugas: boolean; // FR-005: Whether tasks have custom ordering
   tugas: Array<{
     id_order: string;
     alamat_penjemputan: string;
@@ -24,6 +26,7 @@ interface CourierTaskResponse {
     status: string;
     berat_kg?: number;
     google_maps_url: string;
+    urutan?: number; // FR-005: Manual task sequence number
   }>;
 }
 
@@ -60,21 +63,26 @@ router.get(
       return;
     }
 
-    const orders = getOrdersByCourier(id_kurir, courier.id_cabang);
+    // FR-005: Get assigned orders with sequence ordering
+    const { orders: assignedOrders, sequences } = getAssignedOrdersByCourier(id_kurir);
 
-    const tugas = orders.map((order) => ({
-      id_order: order.id_order,
-      alamat_penjemputan: order.alamat_penjemputan,
-      alamat_pengantaran: order.alamat_pengantaran,
-      koordinat_penjemputan: order.koordinat_penjemputan,
-      koordinat_pengantaran: order.koordinat_pengantaran,
-      status: order.status,
-      berat_kg: order.berat_kg,
-      google_maps_url: buildGoogleMapsUrl(
-        order.koordinat_penjemputan.latitude,
-        order.koordinat_penjemputan.longitude,
-      ),
-    }));
+    const tugas = assignedOrders.map((order) => {
+      const sequence = sequences.find((s) => s.id_order === order.id_order);
+      return {
+        id_order: order.id_order,
+        alamat_penjemputan: order.alamat_penjemputan,
+        alamat_pengantaran: order.alamat_pengantaran,
+        koordinat_penjemputan: order.koordinat_penjemputan,
+        koordinat_pengantaran: order.koordinat_pengantaran,
+        status: order.status,
+        berat_kg: order.berat_kg,
+        google_maps_url: buildGoogleMapsUrl(
+          order.koordinat_penjemputan.latitude,
+          order.koordinat_penjemputan.longitude,
+        ),
+        urutan: sequence?.urutan,
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -82,6 +90,7 @@ router.get(
       nama_kurir: courier.nama_kurir,
       id_cabang: courier.id_cabang,
       total_tugas: tugas.length,
+      urutan_tugas: sequences.length > 0 && sequences.length === tugas.length,
       tugas,
     });
   },

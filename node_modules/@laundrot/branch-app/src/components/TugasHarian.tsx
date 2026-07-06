@@ -8,6 +8,7 @@ interface CourierTask {
   status: string;
   berat_kg?: number;
   google_maps_url: string;
+  urutan?: number; // FR-005: Manual task sequence number
 }
 
 interface TugasHarianResponse {
@@ -16,6 +17,7 @@ interface TugasHarianResponse {
   nama_kurir: string;
   id_cabang: string;
   total_tugas: number;
+  urutan_tugas: boolean; // FR-005: Whether custom sequence is applied
   tugas: CourierTask[];
 }
 
@@ -31,15 +33,19 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const NEXT_STATUS: Record<string, string> = {
+  // FR-003: Siklus status berjenjang Pending → On Route → Arrived → Done
   Pending: 'On Route',
   'On Route': 'Arrived',
   Arrived: 'Done',
 };
 
 // ==========================================
-// TUGAS HARIAN - FR-LOG-03 Core Implementation
+// TUGAS HARIAN - FR-LOG-03, FR-001, FR-002, FR-003
 // Kurir melihat koordinat alamat tugas dan pintasan navigasi Google Maps
 // NF03: Offline Queue dengan timestamp preservation
+// FR-001: Daftar penugasan urutan manual dari Admin Branch
+// FR-002: Tautan navigasi luar Google Maps
+// FR-003: Siklus status Pending → On Route → Arrived → Done dengan offline queue badge
 // ==========================================
 function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-600 border-slate-200';
@@ -73,7 +79,7 @@ function QueueIndicator({ count, syncing }: { count: number; syncing: boolean })
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          {count} aksi menunggu sinkronisasi
+          🔄 Tersimpan di Antrean Lokal ({count} aksi) - Sinkron otomatis saat online
         </span>
       )}
     </div>
@@ -87,8 +93,16 @@ function TaskCard({ task, onStatusChange, queuedActions }: { task: CourierTask; 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5">
       <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-base font-semibold text-navy">{task.id_order}</h3>
+        <div className="flex items-center gap-3">
+          {/* FR-005: Sequence Number Badge */}
+          {task.urutan && (
+            <span className="w-8 h-8 rounded-full bg-deep-blue text-white text-sm font-bold flex items-center justify-center">
+              {task.urutan}
+            </span>
+          )}
+          <div>
+            <h3 className="text-base font-semibold text-navy">{task.id_order}</h3>
+          </div>
         </div>
         <StatusBadge status={task.status} />
       </div>
@@ -248,7 +262,14 @@ export function TugasHarian({ idKurir }: Props) {
     <div>
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold text-navy">Tugas Harian</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-navy">Tugas Harian</h2>
+            {data.urutan_tugas && (
+              <span className="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-full text-xs font-medium">
+                📋 Urutan Plot Manual
+              </span>
+            )}
+          </div>
           <OnlineIndicator online={online} />
         </div>
         <p className="text-sm text-slate-500">

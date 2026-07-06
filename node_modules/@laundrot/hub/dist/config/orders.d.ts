@@ -21,4 +21,21 @@ export interface CreateOrderFromWhatsAppParams {
 export declare function createOrderFromWhatsApp(params: CreateOrderFromWhatsAppParams): Order;
 export declare function getIncomingOrdersByBranch(id_cabang: string): Order[];
 export declare function getAllOrdersByBranch(id_cabang: string): Order[];
+export declare function assignOrderToCourier(id_order: string, id_kurir: string, assigned_by?: string): Order | null;
+export interface CourierTaskSequence {
+    id_order: string;
+    urutan: number;
+    id_kurir: string;
+    alamat_penjemputan: string;
+    status: string;
+    berat_kg?: number;
+    assigned_at?: Date;
+}
+export declare function getCourierTaskSequence(id_kurir: string): CourierTaskSequence[];
+export declare function setCourierTaskSequence(id_kurir: string, sequences: CourierTaskSequence[]): void;
+export declare function reorderCourierTasks(id_kurir: string, orderedTaskIds: string[]): CourierTaskSequence[];
+export declare function getAssignedOrdersByCourier(id_kurir: string): {
+    orders: Order[];
+    sequences: CourierTaskSequence[];
+};
 //# sourceMappingURL=orders.d.ts.map

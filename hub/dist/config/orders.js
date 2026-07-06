@@ -8,10 +8,16 @@ exports.updateOrderStatus = updateOrderStatus;
 exports.createOrderFromWhatsApp = createOrderFromWhatsApp;
 exports.getIncomingOrdersByBranch = getIncomingOrdersByBranch;
 exports.getAllOrdersByBranch = getAllOrdersByBranch;
+exports.assignOrderToCourier = assignOrderToCourier;
+exports.getCourierTaskSequence = getCourierTaskSequence;
+exports.setCourierTaskSequence = setCourierTaskSequence;
+exports.reorderCourierTasks = reorderCourierTasks;
+exports.getAssignedOrdersByCourier = getAssignedOrdersByCourier;
 // ==========================================
-// ORDERS CONFIG - FR-LOG-01, FR-LOG-02 Integration
+// ORDERS CONFIG - FR-LOG-01, FR-LOG-02, FR-005 Integration
 // WhatsApp Order Hub allocates orders to nearest branch
 // Branch admin receives allocated orders for batch processing
+// FR-005: Admin can assign orders to couriers with task ordering
 // ==========================================
 exports.ORDERS = [
     {
@@ -132,5 +138,72 @@ function getIncomingOrdersByBranch(id_cabang) {
 // Get all orders for branch (including processed)
 function getAllOrdersByBranch(id_cabang) {
     return exports.ORDERS.filter((o) => o.id_cabang === id_cabang);
+}
+// ==========================================
+// FR-005: Assign Order to Courier
+// Assigns an order to a specific courier for pickup/delivery
+// ==========================================
+function assignOrderToCourier(id_order, id_kurir, assigned_by) {
+    const order = getOrderById(id_order);
+    if (!order)
+        return null;
+    order.id_kurir = id_kurir;
+    order.assigned_by = assigned_by;
+    order.assigned_at = new Date();
+    order.updated_at = new Date();
+    return order;
+}
+// Manual task ordering storage
+const TASK_SEQUENCES = new Map();
+function getCourierTaskSequence(id_kurir) {
+    return TASK_SEQUENCES.get(id_kurir) || [];
+}
+function setCourierTaskSequence(id_kurir, sequences) {
+    TASK_SEQUENCES.set(id_kurir, sequences);
+}
+function reorderCourierTasks(id_kurir, orderedTaskIds) {
+    const orders = exports.ORDERS.filter((o) => o.id_kurir === id_kurir);
+    const sequences = [];
+    orderedTaskIds.forEach((id_order, index) => {
+        const order = orders.find((o) => o.id_order === id_order);
+        if (order) {
+            sequences.push({
+                id_order: order.id_order,
+                urutan: index + 1,
+                id_kurir: id_kurir,
+                alamat_penjemputan: order.alamat_penjemputan,
+                status: order.status,
+                berat_kg: order.berat_kg,
+                assigned_at: order.assigned_at,
+            });
+        }
+    });
+    TASK_SEQUENCES.set(id_kurir, sequences);
+    return sequences;
+}
+// ==========================================
+// FR-005: Get Orders Assigned to Courier (with sequence)
+// Returns orders in their manually plotted sequence
+// ==========================================
+function getAssignedOrdersByCourier(id_kurir) {
+    const orders = exports.ORDERS.filter((o) => o.id_kurir === id_kurir && o.status !== 'Done' && o.status !== 'Dibatalkan');
+    const sequences = getCourierTaskSequence(id_kurir);
+    // Sort orders by sequence if exists, otherwise by assignment date
+    const orderedOrders = [...orders].sort((a, b) => {
+        const seqA = sequences.find((s) => s.id_order === a.id_order);
+        const seqB = sequences.find((s) => s.id_order === b.id_order);
+        if (seqA && seqB) {
+            return seqA.urutan - seqB.urutan;
+        }
+        if (seqA)
+            return -1;
+        if (seqB)
+            return 1;
+        // Fallback: sort by assigned_at
+        const dateA = a.assigned_at?.getTime() || 0;
+        const dateB = b.assigned_at?.getTime() || 0;
+        return dateA - dateB;
+    });
+    return { orders: orderedOrders, sequences };
 }
 //# sourceMappingURL=orders.js.map

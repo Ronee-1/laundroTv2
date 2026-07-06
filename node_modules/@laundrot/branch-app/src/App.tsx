@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar.tsx';
 import { TugasHarian } from './components/TugasHarian.tsx';
 import { DashboardEksekutif } from './components/DashboardEksekutif.tsx';
+import { DashboardAdmin } from './components/DashboardAdmin.tsx';
 import { ExpenseForm } from './components/ExpenseForm.tsx';
 import { AuditRekonsiliasi } from './components/AuditRekonsiliasi.tsx';
 import { InventarisPemantau } from './components/InventarisPemantau.tsx';
@@ -9,12 +10,17 @@ import { DashboardKurir } from './components/DashboardKurir.tsx';
 import { InputPelanggan } from './components/InputPelanggan.tsx';
 import { WhatsAppOrderHub } from './components/WhatsAppOrderHub.tsx';
 import { IncomingOrders } from './components/IncomingOrders.tsx';
+import { CourierAssignment } from './components/CourierAssignment.tsx';
+import { OutletReception } from './components/OutletReception.tsx';
 
 // ==========================================
-// PAGE TYPES - FR-LOG-02 Integration
+// PAGE TYPES - FR-LOG-02, FR-SERVICE-01 Integration
 // 'incoming-orders' = Pesanan masuk dari WhatsApp Hub
+// 'admin-dashboard' = Dashboard Admin Branch
+// 'courier-assignment' = FR-005: Alokasi & Plot Tugas Kurir
+// 'outlet-reception' = FR-SERVICE-01: Input layanan dengan kalkulasi otomatis
 // ==========================================
-export type Page = 'tugas' | 'dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir' | 'input-pelanggan' | 'whatsapp-hub' | 'incoming-orders';
+export type Page = 'tugas' | 'dashboard' | 'admin-dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir' | 'input-pelanggan' | 'whatsapp-hub' | 'incoming-orders' | 'courier-assignment' | 'outlet-reception';
 export type UserRole = 'Owner' | 'Admin Cabang' | 'Kurir Logistik';
 
 export interface Notification {
@@ -24,12 +30,12 @@ export interface Notification {
 
 const ROLE_DEFAULT_PAGE: Record<UserRole, Page> = {
   Owner: 'dashboard',
-  'Admin Cabang': 'dashboard',
+  'Admin Cabang': 'admin-dashboard',
   'Kurir Logistik': 'kurir',
 };
 
 // ============================================
-// LOGIN PORTAL - Deep Luxury Navy & Mint
+// LOGIN PORTAL - Material Design 3
 // ============================================
 function LoginPortal({ onLogin }: { onLogin: (role: UserRole) => void }) {
   const roles: { role: UserRole; title: string; description: string; icon: React.ReactNode }[] = [
@@ -66,58 +72,65 @@ function LoginPortal({ onLogin }: { onLogin: (role: UserRole) => void }) {
   ];
 
   return (
-    <div className="min-h-screen bg-base-bg flex flex-col items-center justify-center p-8">
-      {/* Logo & Branding */}
+    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ backgroundColor: '#f8f9ff' }}>
+      {/* Logo & Branding - Material Design 3 */}
       <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-navy rounded-2xl mb-6">
-          <svg className="w-8 h-8 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6" style={{ backgroundColor: '#15157d' }}>
+          <svg className="w-8 h-8" style={{ color: '#14b8a6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-navy tracking-tight">LaundroTruck</h1>
-        <p className="text-sm text-slate-500 mt-2">Sistem Multi-Cabang — Pilih peran Anda</p>
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#15157d' }}>LaundroTruck</h1>
+        <p className="text-sm mt-2" style={{ color: '#464652' }}>Sistem Multi-Cabang — Pilih peran Anda</p>
       </div>
 
-      {/* Role Selection Cards - Premium Flat Design */}
+      {/* Role Selection Cards - Material Design 3 */}
       <div className="w-full max-w-md space-y-3">
         {roles.map((item) => (
           <button
             key={item.role}
             onClick={() => onLogin(item.role)}
-            className="w-full bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-deep-blue transition-all group text-left"
+            className="w-full flex items-center gap-4 p-5 rounded-2xl transition-all duration-200 text-left group hover:scale-[1.02]"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid #c7c5d4'
+            }}
           >
-            <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal group-hover:bg-teal transition-all">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all"
+              style={{ backgroundColor: '#ccfbf1', color: '#0d9488' }}
+            >
               {item.icon}
             </div>
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-navy">{item.title}</h3>
-              <p className="text-sm text-slate-500 mt-0.5">{item.description}</p>
+              <h3 className="text-base font-semibold" style={{ color: '#0b1c30' }}>{item.title}</h3>
+              <p className="text-sm mt-0.5" style={{ color: '#464652' }}>{item.description}</p>
             </div>
-            <svg className="w-5 h-5 text-slate-400 group-hover:text-navy group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" style={{ color: '#464652' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         ))}
       </div>
 
-      <p className="text-xs text-slate-400 mt-12">Laundro Truck v2.0 — Hub-and-Spoke Architecture</p>
+      <p className="text-xs mt-12" style={{ color: '#777683' }}>Laundro Truck v2.0 — Hub-and-Spoke Architecture</p>
     </div>
   );
 }
 
 // ============================================
-// NOTIFICATION TOAST - Premium Flat Design
+// NOTIFICATION TOAST - Material Design 3
 // ============================================
 function NotificationToast({ notification, onClose }: { notification: Notification; onClose: () => void }) {
-  const getColors = () => {
-    if (notification.type === 'success') return 'bg-teal-50 border-teal text-teal';
-    if (notification.type === 'error') return 'bg-red-50 border-red-200 text-red-600';
-    return 'bg-amber-50 border-amber-200 text-amber-600';
+  const getStyles = () => {
+    if (notification.type === 'success') return 'toast-success';
+    if (notification.type === 'error') return 'toast-error';
+    return 'toast-warning';
   };
-  const colors = getColors();
 
   return (
-    <div className={`fixed top-6 right-6 z-50 max-w-sm p-4 rounded-2xl flex items-start gap-3 border ${colors}`}>
+    <div className={`toast ${getStyles()}`}>
       <div className="flex-1 text-sm font-medium">{notification.message}</div>
       <button onClick={onClose} className="opacity-60 hover:opacity-100">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,7 +142,7 @@ function NotificationToast({ notification, onClose }: { notification: Notificati
 }
 
 // ============================================
-// MAIN APP - Deep Luxury Navy & Mint Design
+// MAIN APP - Material Design 3
 // ============================================
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -169,39 +182,45 @@ function App() {
     );
   }
 
-  // Main Application - Premium Flat Design
+  // Main Application - Material Design 3
   return (
-    <div className="min-h-screen bg-base-bg text-navy">
+    <div className="min-h-screen" style={{ backgroundColor: '#f8f9ff' }}>
       {notification && (
         <NotificationToast notification={notification} onClose={() => setNotification(null)} />
       )}
 
-      {/* Header - Premium Flat Design */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-navy rounded-2xl flex items-center justify-center">
-            <svg className="w-5 h-5 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {/* Header - Material Design 3 */}
+      <header
+        className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16"
+        style={{
+          backgroundColor: 'white',
+          borderBottom: '1px solid #c7c5d4'
+        }}
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#15157d' }}>
+            <svg className="w-5 h-5" style={{ color: '#14b8a6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-navy">LaundroTruck</span>
-          <span className="text-xs bg-teal-50 text-teal px-2.5 py-0.5 rounded-full font-medium">v2.0</span>
+          <span className="text-lg font-bold" style={{ color: '#0056c6' }}>LaundroT v2.0</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-base-bg px-4 py-2 rounded-2xl border border-slate-200">
-            <span className="w-2 h-2 rounded-full bg-deep-blue"></span>
-            <span className="text-sm font-medium text-navy">{userRole}</span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ backgroundColor: '#eff4ff', border: '1px solid #c7c5d4' }}>
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0056c6' }}></span>
+            <span className="text-sm font-medium" style={{ color: '#0b1c30' }}>{userRole}</span>
             {userRole === 'Admin Cabang' && (
               <>
-                <span className="text-slate-300">|</span>
+                <span style={{ color: '#c7c5d4' }}>|</span>
                 <select
                   value={selectedAdminBranch}
                   onChange={(e) => {
                     setSelectedAdminBranch(e.target.value);
                     triggerNotification('Cabang aktif diubah.', 'success');
                   }}
-                  className="bg-transparent text-sm font-medium text-navy focus:outline-none cursor-pointer"
+                  className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
+                  style={{ color: '#0b1c30' }}
                 >
                   <option value="CBG-001">Depok (Pusat)</option>
                   <option value="CBG-002">Jakarta Selatan</option>
@@ -214,7 +233,11 @@ function App() {
           </div>
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-navy px-4 py-2 rounded-2xl border border-slate-200 hover:border-navy transition-all"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-all"
+            style={{
+              color: '#464652',
+              border: '1px solid #c7c5d4'
+            }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -225,12 +248,19 @@ function App() {
       </header>
 
       {/* Content Area */}
-      <div className="flex">
+      <div className="flex pt-16">
         <Sidebar currentPage={page} onNavigate={setPage} userRole={userRole} />
-        <main className="flex-1 ml-60 p-6 min-h-[calc(100vh-73px)]">
+        <main className="flex-1 lg:ml-[280px] p-6 min-h-[calc(100vh-64px)]">
           {page === 'tugas' && <TugasHarian idKurir="KUR-001" />}
           {page === 'dashboard' && (
             <DashboardEksekutif
+              userRole={userRole}
+              selectedAdminBranch={selectedAdminBranch}
+              triggerNotification={triggerNotification}
+            />
+          )}
+          {page === 'admin-dashboard' && (
+            <DashboardAdmin
               userRole={userRole}
               selectedAdminBranch={selectedAdminBranch}
               triggerNotification={triggerNotification}
@@ -265,6 +295,20 @@ function App() {
           {page === 'input-pelanggan' && (
             <InputPelanggan
               selectedAdminBranch={selectedAdminBranch}
+              triggerNotification={triggerNotification}
+            />
+          )}
+          {page === 'courier-assignment' && (
+            <CourierAssignment
+              selectedAdminBranch={selectedAdminBranch}
+              onSuccess={(msg) => triggerNotification(msg, 'success')}
+              onError={(msg) => triggerNotification(msg, 'error')}
+            />
+          )}
+          {page === 'outlet-reception' && (
+            <OutletReception
+              selectedAdminBranch={selectedAdminBranch}
+              userRole={userRole}
               triggerNotification={triggerNotification}
             />
           )}

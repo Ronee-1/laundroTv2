@@ -464,6 +464,40 @@ router.post(
   },
 );
 
+// ==========================================
+// FR-012: Daily Financial Summary for Admin Audit
+// Returns today's income, expenses, and remaining cash
+// ==========================================
+type DailySummaryResponse = | { success: true; id_cabang: string; total_pemasukan: number; total_pengeluaran: number; sisa_kas: number; transaction_count: number }
+  | { success: false; error: string };
+
+router.get(
+  '/:id_cabang/daily-summary',
+  (req: Request<{ id_cabang: string }, DailySummaryResponse>, res: Response<DailySummaryResponse>) => {
+    const { id_cabang } = req.params;
+
+    const branch = getBranchById(id_cabang);
+    if (!branch) {
+      res.status(404).json({ success: false, error: `Cabang dengan ID "${id_cabang}" tidak ditemukan.` });
+      return;
+    }
+
+    // Calculate from approved expenses
+    const total_pengeluaran = getTotalApprovedExpenses(id_cabang);
+    const total_pemasukan = branch.omzet * 0.7; // Mock: 70% of omzet as today's income
+    const sisa_kas = total_pemasukan - total_pengeluaran;
+
+    res.status(200).json({
+      success: true,
+      id_cabang,
+      total_pemasukan,
+      total_pengeluaran,
+      sisa_kas,
+      transaction_count: Math.floor(Math.random() * 20) + 5, // Mock transaction count
+    });
+  },
+);
+
 interface CustomerBody {
   nama: string;
   whatsapp: string;

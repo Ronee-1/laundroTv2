@@ -1,7 +1,10 @@
 // ==========================================
-// SIDEBAR NAVIGATION - FR-LOG-02 Integration
+// SIDEBAR NAVIGATION - FR-LOG-02, FR-005 Integration
 // 'incoming-orders' menu for Admin Branch
+// 'admin-dashboard' = Branch Overview untuk Admin Branch (Material Design 3)
+// 'courier-assignment' = FR-005: Alokasi & Plot Tugas Kurir
 // Shows orders allocated from WhatsApp Hub
+// Material Design 3 Styling
 // ==========================================
 import type { Page, UserRole } from '../App.tsx';
 
@@ -15,10 +18,20 @@ const NAV_ITEMS: { key: Page; label: string; roles: UserRole[]; icon: React.Reac
   {
     key: 'dashboard',
     label: 'Dashboard',
-    roles: ['Owner', 'Admin Cabang'],
+    roles: ['Owner'],
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+  },
+  {
+    key: 'admin-dashboard',
+    label: 'Branch Overview',
+    roles: ['Admin Cabang'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     ),
   },
@@ -93,6 +106,26 @@ const NAV_ITEMS: { key: Page; label: string; roles: UserRole[]; icon: React.Reac
     ),
   },
   {
+    key: 'courier-assignment',
+    label: 'Tugas Kurir',
+    roles: ['Admin Cabang'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+  },
+  {
+    key: 'outlet-reception',
+    label: 'Input Layanan Outlet',
+    roles: ['Admin Cabang'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     key: 'incoming-orders',
     label: 'Pesanan Masuk',
     roles: ['Admin Cabang'],
@@ -108,22 +141,30 @@ export function Sidebar({ currentPage, onNavigate, userRole }: SidebarProps) {
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   return (
-    <aside className="fixed left-0 top-[65px] h-[calc(100vh-65px)] w-60 bg-white border-r border-slate-200 flex flex-col z-30">
+    <aside
+      className="fixed left-0 top-16 h-[calc(100vh-64px)] w-[280px] flex flex-col z-30 overflow-y-auto hidden lg:flex"
+      style={{ backgroundColor: '#eff4ff', borderRight: '1px solid #c7c5d4' }}
+    >
       <nav className="flex-1 p-4 space-y-1">
-        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-4 px-3">Menu</div>
+        <div className="text-xs font-semibold uppercase tracking-wider mb-4 px-4" style={{ color: '#464652' }}>
+          Menu
+        </div>
         {visibleItems.map((item) => {
           const isActive = currentPage === item.key;
           return (
             <button
               key={item.key}
               onClick={() => onNavigate(item.key)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-deep-blue text-white'
-                  : 'text-slate-500 hover:bg-base-bg hover:text-navy'
-              }`}
+              className="nav-item w-full"
+              style={isActive ? {
+                backgroundColor: '#e5eeff',
+                color: '#0056c6',
+                fontWeight: 700
+              } : {
+                color: '#464652'
+              }}
             >
-              <span className={isActive ? 'text-white' : 'text-slate-400'}>
+              <span style={isActive ? { color: '#0056c6' } : { color: '#777683' }}>
                 {item.icon}
               </span>
               {item.label}
@@ -133,17 +174,19 @@ export function Sidebar({ currentPage, onNavigate, userRole }: SidebarProps) {
       </nav>
 
       {/* System Info Footer */}
-      <div className="p-4 border-t border-slate-200">
-        <div className="bg-base-bg p-4 rounded-2xl">
-          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Info Sistem</div>
+      <div className="p-4 border-t" style={{ borderColor: '#c7c5d4' }}>
+        <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#464652' }}>
+            Info Sistem
+          </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-500">Cabang</span>
-              <span className="font-semibold text-navy">5</span>
+              <span style={{ color: '#464652' }}>Cabang</span>
+              <span className="font-semibold" style={{ color: '#15157d' }}>5</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Arsitektur</span>
-              <span className="font-semibold text-navy">Hub-Spoke</span>
+              <span style={{ color: '#464652' }}>Arsitektur</span>
+              <span className="font-semibold" style={{ color: '#15157d' }}>Hub-Spoke</span>
             </div>
           </div>
         </div>

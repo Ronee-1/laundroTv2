@@ -6,6 +6,7 @@ const quota_js_1 = require("../services/quota.js");
 const orders_js_1 = require("../config/orders.js");
 const cashbook_js_1 = require("../services/cashbook.js");
 const branches_js_1 = require("../config/branches.js");
+const couriers_js_1 = require("../config/couriers.js");
 const router = (0, express_1.Router)();
 router.post('/allocate', (req, res) => {
     const { alamat_pelanggan, koordinat } = req.body;
@@ -179,6 +180,120 @@ router.get('/branch/:id_cabang/all', (req, res) => {
         id_cabang,
         total_orders: orders.length,
         orders,
+    });
+});
+router.patch('/:id_order/assign', (req, res) => {
+    const { id_order } = req.params;
+    const { id_kurir, assigned_by } = req.body;
+    if (!id_kurir) {
+        res.status(400).json({
+            success: false,
+            error: 'id_kurir wajib diisi.',
+        });
+        return;
+    }
+    const order = (0, orders_js_1.getAllOrdersByBranch)('').find((o) => o.id_order === id_order);
+    if (!order) {
+        res.status(404).json({
+            success: false,
+            error: `Pesanan dengan ID "${id_order}" tidak ditemukan.`,
+        });
+        return;
+    }
+    // Verify courier exists
+    const courier = (0, couriers_js_1.getCourierById)(id_kurir);
+    if (!courier) {
+        res.status(404).json({
+            success: false,
+            error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+        });
+        return;
+    }
+    // Verify courier belongs to the same branch as the order
+    if (courier.id_cabang !== order.id_cabang) {
+        res.status(400).json({
+            success: false,
+            error: `Kurir ${id_kurir} tidak bertugas di cabang ${order.id_cabang}. Kurir hanya bisa menerima pesanan dari cabangnya sendiri.`,
+        });
+        return;
+    }
+    const updatedOrder = (0, orders_js_1.assignOrderToCourier)(id_order, id_kurir, assigned_by);
+    if (!updatedOrder) {
+        res.status(404).json({
+            success: false,
+            error: `Gagal assigning order: Pesanan tidak ditemukan.`,
+        });
+        return;
+    }
+    res.status(200).json({
+        success: true,
+        id_order: updatedOrder.id_order,
+        id_kurir: updatedOrder.id_kurir ?? id_kurir,
+        nama_kurir: courier.nama_kurir,
+        message: `Pesanan ${id_order} berhasil dialokasikan ke kurir ${courier.nama_kurir} (${id_kurir}).`,
+    });
+});
+router.put('/reorder-tasks', (req, res) => {
+    const { id_kurir, ordered_task_ids } = req.body;
+    if (!id_kurir || !ordered_task_ids || !Array.isArray(ordered_task_ids)) {
+        res.status(400).json({
+            success: false,
+            error: 'id_kurir dan ordered_task_ids (array) wajib diisi.',
+        });
+        return;
+    }
+    const courier = (0, couriers_js_1.getCourierById)(id_kurir);
+    if (!courier) {
+        res.status(404).json({
+            success: false,
+            error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+        });
+        return;
+    }
+    const sequences = (0, orders_js_1.reorderCourierTasks)(id_kurir, ordered_task_ids);
+    res.status(200).json({
+        success: true,
+        id_kurir,
+        nama_kurir: courier.nama_kurir,
+        sequences: sequences.map((s) => ({ id_order: s.id_order, urutan: s.urutan })),
+        message: `Urutan tugas kurir ${courier.nama_kurir} berhasil diplot ulang. Total: ${sequences.length} tugas.`,
+    });
+});
+// ==========================================
+// FR-005: Get Courier Tasks with Sequence
+// Returns tasks in their manually plotted sequence
+// ==========================================
+router.get('/courier/:id_kurir/sequence', (req, res) => {
+    const { id_kurir } = req.params;
+    const courier = (0, couriers_js_1.getCourierById)(id_kurir);
+    if (!courier) {
+        res.status(404).json({
+            success: false,
+            error: `Kurir dengan ID "${id_kurir}" tidak ditemukan.`,
+        });
+        return;
+    }
+    const { orders, sequences } = (0, orders_js_1.getAssignedOrdersByCourier)(id_kurir);
+    res.status(200).json({
+        success: true,
+        id_kurir,
+        nama_kurir: courier.nama_kurir,
+        id_cabang: courier.id_cabang,
+        total_tugas: orders.length,
+        sequences: sequences.map((s) => ({
+            id_order: s.id_order,
+            urutan: s.urutan,
+            alamat_penjemputan: s.alamat_penjemputan,
+            status: s.status,
+            berat_kg: s.berat_kg,
+            assigned_at: s.assigned_at?.toISOString(),
+        })),
+        orders: orders.map((o) => ({
+            id_order: o.id_order,
+            alamat_penjemputan: o.alamat_penjemputan,
+            status: o.status,
+            berat_kg: o.berat_kg,
+        })),
     });
 });
 const VALID_STATUSES = [
