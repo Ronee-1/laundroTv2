@@ -8,8 +8,8 @@ export interface QuotaCheckResult {
   sisa_kuota: number;
 }
 
-export function checkQuota(id_cabang: string): QuotaCheckResult | null {
-  const branch = getBranchById(id_cabang);
+export async function checkQuota(id_cabang: string): Promise<QuotaCheckResult | null> {
+  const branch = await getBranchById(id_cabang);
   if (!branch) return null;
 
   return {

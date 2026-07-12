@@ -86,8 +86,8 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
     sisaKasAkhirLaci: 0,
   });
 
-  const isAdmin = userRole === 'Admin Cabang';
-  const isOwner = userRole === 'Owner';
+  const isAdmin = userRole === 'Admin';
+ const isOwner = userRole === 'Owner';
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);

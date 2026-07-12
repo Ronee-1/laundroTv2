@@ -1,4 +1,6 @@
-import type { Courier, Order } from '@laundrot/shared-types';
+import { prisma } from '../lib/prisma.js';
+import type { Courier as PrismaCourier } from '../generated/prisma/client.js';
+import type { Courier } from '@laundrot/shared-types';
 
 // ==========================================
 // COURIERS CONFIG - FR-LOG-02, FR-LOG-03 Integration
@@ -6,7 +8,8 @@ import type { Courier, Order } from '@laundrot/shared-types';
 // Courier views tasks in mobile app (TugasHarian)
 // ==========================================
 
-export const COURIERS: Courier[] = [
+// Default couriers (fallback)
+const DEFAULT_COURIERS: Courier[] = [
   {
     id_kurir: 'KUR-001',
     id_cabang: 'CBG-001',
@@ -54,11 +57,170 @@ export const COURIERS: Courier[] = [
   },
 ];
 
-export function getCourierById(id_kurir: string): Courier | undefined {
-  return COURIERS.find((c) => c.id_kurir === id_kurir);
+// ==========================================
+// COURIER CRUD OPERATIONS
+// ==========================================
+
+/**
+ * Get courier by ID from database
+ */
+export async function getCourierByIdFromDB(id_kurir: string): Promise<Courier | null> {
+  const courier = await prisma.courier.findUnique({
+    where: { id_kurir },
+  });
+
+  if (!courier) return null;
+
+  return {
+    id_kurir: courier.id_kurir,
+    id_cabang: courier.id_cabang,
+    nama_kurir: courier.nama_kurir,
+    nomor_telepon: courier.nomor_telepon,
+    is_available: courier.is_available,
+    created_at: courier.created_at,
+    updated_at: courier.updated_at,
+  };
 }
 
-// FR-LOG-02: Get all couriers for a specific branch
-export function getCouriersByBranch(id_cabang: string): Courier[] {
-  return COURIERS.filter((c) => c.id_cabang === id_cabang);
+/**
+ * Get all couriers for a branch from database
+ */
+export async function getCouriersByBranchFromDB(id_cabang: string): Promise<Courier[]> {
+  const couriers = await prisma.courier.findMany({
+    where: { id_cabang },
+    orderBy: { nama_kurir: 'asc' },
+  });
+
+  return couriers.map((c: PrismaCourier) => ({
+    id_kurir: c.id_kurir,
+    id_cabang: c.id_cabang,
+    nama_kurir: c.nama_kurir,
+    nomor_telepon: c.nomor_telepon,
+    is_available: c.is_available,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+  }));
+}
+
+/**
+ * Get all couriers from database
+ */
+export async function getAllCouriersFromDB(): Promise<Courier[]> {
+  const couriers = await prisma.courier.findMany({
+    orderBy: [
+      { id_cabang: 'asc' },
+      { nama_kurir: 'asc' },
+    ],
+  });
+
+  return couriers.map((c: PrismaCourier) => ({
+    id_kurir: c.id_kurir,
+    id_cabang: c.id_cabang,
+    nama_kurir: c.nama_kurir,
+    nomor_telepon: c.nomor_telepon,
+    is_available: c.is_available,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+  }));
+}
+
+/**
+ * Update courier availability
+ */
+export async function updateCourierAvailability(id_kurir: string, is_available: boolean): Promise<Courier | null> {
+  try {
+    const courier = await prisma.courier.update({
+      where: { id_kurir },
+      data: { is_available },
+    });
+
+    return {
+      id_kurir: courier.id_kurir,
+      id_cabang: courier.id_cabang,
+      nama_kurir: courier.nama_kurir,
+      nomor_telepon: courier.nomor_telepon,
+      is_available: courier.is_available,
+      created_at: courier.created_at,
+      updated_at: courier.updated_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ==========================================
+// SYNC FUNCTIONS (for backward compatibility) - Now using database
+// ==========================================
+
+/**
+ * Get courier by ID - uses database
+ */
+export async function getCourierById(id_kurir: string): Promise<Courier | null> {
+  try {
+    const courier = await prisma.courier.findUnique({
+      where: { id_kurir },
+    });
+
+    if (!courier) return null;
+
+    return {
+      id_kurir: courier.id_kurir,
+      id_cabang: courier.id_cabang,
+      nama_kurir: courier.nama_kurir,
+      nomor_telepon: courier.nomor_telepon,
+      is_available: courier.is_available,
+      created_at: courier.created_at,
+      updated_at: courier.updated_at,
+    };
+  } catch (error) {
+    console.error(`[Couriers] Error getting courier ${id_kurir}:`, error);
+    // Fallback to in-memory
+    return DEFAULT_COURIERS.find((c) => c.id_kurir === id_kurir) ?? null;
+  }
+}
+
+/**
+ * Get all couriers for a specific branch - uses database
+ */
+export async function getCouriersByBranch(id_cabang: string): Promise<Courier[]> {
+  try {
+    const couriers = await prisma.courier.findMany({
+      where: { id_cabang },
+      orderBy: { nama_kurir: 'asc' },
+    });
+
+    return couriers.map((c: PrismaCourier) => ({
+      id_kurir: c.id_kurir,
+      id_cabang: c.id_cabang,
+      nama_kurir: c.nama_kurir,
+      nomor_telepon: c.nomor_telepon,
+      is_available: c.is_available,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+    }));
+  } catch (error) {
+    console.error(`[Couriers] Error getting couriers for branch ${id_cabang}:`, error);
+    // Fallback to in-memory
+    return DEFAULT_COURIERS.filter((c) => c.id_cabang === id_cabang);
+  }
+}
+
+/**
+ * Seed default couriers to database (for initial setup)
+ */
+export async function seedDefaultCouriers(): Promise<void> {
+  for (const courier of DEFAULT_COURIERS) {
+    await prisma.courier.upsert({
+      where: { id_kurir: courier.id_kurir },
+      update: {},
+      create: {
+        id_kurir: courier.id_kurir,
+        id_cabang: courier.id_cabang,
+        nama_kurir: courier.nama_kurir,
+        nomor_telepon: courier.nomor_telepon,
+        is_available: courier.is_available,
+      },
+    });
+  }
+  console.log('[Couriers] Default couriers seeded');
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getQueue, addToQueue, syncQueue, isOnline, type QueuedAction } from '../utils/offlineQueue.ts';
+import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface CourierTask {
   id_order: string;
@@ -22,7 +23,7 @@ interface TugasHarianResponse {
 }
 
 interface Props {
-  idKurir: string;
+  idKurir?: string; // Optional - will use auth context if not provided
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -150,13 +151,17 @@ function TaskCard({ task, onStatusChange, queuedActions }: { task: CourierTask; 
   );
 }
 
-export function TugasHarian({ idKurir }: Props) {
+export function TugasHarian({ idKurir: propIdKurir }: Props) {
+  const { user } = useAuth();
   const [data, setData] = useState<TugasHarianResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [online, setOnline] = useState(isOnline());
   const [queue, setQueue] = useState<QueuedAction[]>(getQueue());
   const [syncing, setSyncing] = useState(false);
+
+  // Get courier ID from prop or auth context
+  const courierId = propIdKurir || user?.courier_id || 'KUR-001';
 
   const refreshQueue = useCallback(() => {
     setQueue(getQueue());
@@ -220,7 +225,7 @@ export function TugasHarian({ idKurir }: Props) {
     let cancelled = false;
     async function fetchTasks() {
       try {
-        const res = await fetch(`/api/couriers/${idKurir}/tasks`);
+        const res = await fetch(`/api/couriers/${courierId}/tasks`);
         const json = (await res.json()) as TugasHarianResponse | { success: false; error: string };
         if (cancelled) return;
         if (!res.ok || !('tugas' in json)) {
@@ -236,7 +241,7 @@ export function TugasHarian({ idKurir }: Props) {
     }
     fetchTasks();
     return () => { cancelled = true; };
-  }, [idKurir]);
+  }, [courierId]);
 
   if (loading) {
     return (

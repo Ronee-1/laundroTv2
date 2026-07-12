@@ -12,17 +12,41 @@ export interface ReconciliationLog {
     catatan_owner?: string;
     created_at: Date;
 }
+/**
+ * Create new reconciliation log
+ */
 export declare function createReconciliation(params: {
     id_cabang: string;
     kas_digital: number;
     kas_fisik: number;
     catatan?: string;
-}): ReconciliationLog;
-export declare function getReconciliationByBranch(id_cabang: string): ReconciliationLog[];
-export declare function getAllReconciliations(): ReconciliationLog[];
-export declare function getLatestReconciliation(id_cabang: string): ReconciliationLog | undefined;
-export declare function getReconciliationById(id_rekonsiliasi: string): ReconciliationLog | undefined;
-export declare function approveReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null;
-export declare function rejectReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null;
-export declare function overrideReconciliation(id_rekonsiliasi: string, new_kas_fisik: number, catatan_owner?: string): ReconciliationLog | null;
+}): Promise<ReconciliationLog>;
+/**
+ * Get reconciliation logs by branch
+ */
+export declare function getReconciliationByBranch(id_cabang: string): Promise<ReconciliationLog[]>;
+/**
+ * Get all reconciliations
+ */
+export declare function getAllReconciliations(): Promise<ReconciliationLog[]>;
+/**
+ * Get latest reconciliation for a branch
+ */
+export declare function getLatestReconciliation(id_cabang: string): Promise<ReconciliationLog | null>;
+/**
+ * Get reconciliation by ID
+ */
+export declare function getReconciliationById(id_rekonsiliasi: string): Promise<ReconciliationLog | null>;
+/**
+ * Approve reconciliation
+ */
+export declare function approveReconciliation(id_rekonsiliasi: string, catatan_owner?: string): Promise<ReconciliationLog | null>;
+/**
+ * Reject reconciliation
+ */
+export declare function rejectReconciliation(id_rekonsiliasi: string, catatan_owner?: string): Promise<ReconciliationLog | null>;
+/**
+ * Override reconciliation (adjust values)
+ */
+export declare function overrideReconciliation(id_rekonsiliasi: string, new_kas_fisik: number, catatan_owner?: string): Promise<ReconciliationLog | null>;
 //# sourceMappingURL=reconciliation.d.ts.map

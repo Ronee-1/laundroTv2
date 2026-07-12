@@ -4,8 +4,8 @@ exports.checkQuota = checkQuota;
 exports.generateDelayMessage = generateDelayMessage;
 exports.getNextBusinessDay = getNextBusinessDay;
 const branches_js_1 = require("../config/branches.js");
-function checkQuota(id_cabang) {
-    const branch = (0, branches_js_1.getBranchById)(id_cabang);
+async function checkQuota(id_cabang) {
+    const branch = await (0, branches_js_1.getBranchById)(id_cabang);
     if (!branch)
         return null;
     return {

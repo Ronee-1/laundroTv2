@@ -36,8 +36,8 @@ export interface GeoroutingResult {
   distance_km: number;
 }
 
-export function findNearestBranch(customerCoords: Coordinates): GeoroutingResult | null {
-  const branches = getActiveBranches();
+export async function findNearestBranch(customerCoords: Coordinates): Promise<GeoroutingResult | null> {
+  const branches = await getActiveBranches();
   if (branches.length === 0) return null;
 
   let nearest: GeoroutingResult | null = null;

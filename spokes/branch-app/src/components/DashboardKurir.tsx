@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { isOnline, getLogisticsQueue, addToLogisticsQueue, syncLogisticsQueue, type QueuedLogisticsAction } from '../utils/offlineQueue.ts';
+import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface CourierTask {
   id_order: string;
@@ -59,6 +60,7 @@ function logisticsStatusLabel(status: string): string {
 // DASHBOARD KURIR - Premium Flat Design
 // ==========================================
 export function DashboardKurir({ triggerNotification }: Props) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('pelanggan');
   const [online, setOnline] = useState(isOnline());
   const [customerTasks, setCustomerTasks] = useState<CourierTask[]>([]);
@@ -103,8 +105,10 @@ export function DashboardKurir({ triggerNotification }: Props) {
   }, [online, logisticsQueue, handleSyncLogistics]);
 
   async function fetchCustomerTasks() {
+    // Use courier_id from auth context, fallback to KUR-001 for testing
+    const courierId = user?.courier_id || 'KUR-001';
     try {
-      const res = await fetch('/api/couriers/KUR-001/tasks');
+      const res = await fetch(`/api/couriers/${courierId}/tasks`);
       const json = await res.json();
       if (res.ok && json.success) setCustomerTasks(json.tugas);
     } catch { /* ignore */ }

@@ -17,14 +17,26 @@ export declare const SAFETY_THRESHOLDS: {
     pelembut: number;
     plastik: number;
 };
-export declare function getInventoryByBranch(id_cabang: string): BranchInventory | undefined;
-export declare function getAllInventory(): BranchInventory[];
-export declare function getInventoryStatus(id_cabang: string): 'Aman' | 'Menipis' | 'Kritis';
+/**
+ * Get inventory by branch
+ */
+export declare function getInventoryByBranch(id_cabang: string): Promise<BranchInventory | null>;
+/**
+ * Get all inventory across all branches
+ */
+export declare function getAllInventory(): Promise<BranchInventory[]>;
+/**
+ * Get inventory status for a branch
+ */
+export declare function getInventoryStatus(id_cabang: string): Promise<'Aman' | 'Menipis' | 'Kritis'>;
+/**
+ * Restock inventory items for a branch
+ */
 export declare function restockInventory(id_cabang: string, additions: {
     detergen?: number;
     pelembut?: number;
     plastik?: number;
-}): BranchInventory | null;
+}): Promise<BranchInventory | null>;
 export interface AnomalyLog {
     id: string;
     id_cabang: string;
@@ -35,10 +47,20 @@ export interface AnomalyLog {
     alasan: string;
     timestamp: string;
 }
+/**
+ * Adjust inventory manually (with anomaly logging)
+ */
 export declare function adjustInventory(id_cabang: string, adjustments: {
     item: StockItem;
     stok_baru: number;
     alasan: string;
-}): BranchInventory | null;
-export declare function getAnomalies(): AnomalyLog[];
+}): Promise<BranchInventory | null>;
+/**
+ * Get all inventory anomalies
+ */
+export declare function getAnomalies(): Promise<AnomalyLog[]>;
+/**
+ * Initialize inventory for a new branch
+ */
+export declare function initializeBranchInventory(id_cabang: string): Promise<void>;
 //# sourceMappingURL=inventory.d.ts.map

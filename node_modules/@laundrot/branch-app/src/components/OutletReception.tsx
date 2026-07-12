@@ -17,6 +17,17 @@ interface ServiceTariff {
   estimasi_hari: number;
 }
 
+// Customer interface (matches backend)
+interface Customer {
+  id_pelanggan: string;
+  id_cabang: string;
+  nama: string;
+  whatsapp: string;
+  alamat_maps: string;
+  google_maps_url?: string;
+  created_at: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
   selectedAdminBranch: string;
@@ -42,17 +53,10 @@ const MOCK_SERVICES: ServiceTariff[] = [
   { id_layanan: 'SRV-006', nama_layanan: 'Cuci Only', kategori: 'satuan', satuan: 'kg', harga_per_satuan: 5000, estimasi_hari: 1 },
 ];
 
-// Mock customers for dropdown
-const MOCK_CUSTOMERS = [
-  { id_pelanggan: 'PLG-001', nama: 'Budi Santoso', whatsapp: '081234567890' },
-  { id_pelanggan: 'PLG-002', nama: 'Ani Wijaya', whatsapp: '081234567891' },
-  { id_pelanggan: 'PLG-003', nama: 'Dedi Kurniawan', whatsapp: '081234567892' },
-];
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function OutletReception({ selectedAdminBranch, userRole: _userRole, triggerNotification }: Props) {
   const [services, setServices] = useState<ServiceTariff[]>(MOCK_SERVICES);
-  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Form state
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -86,12 +90,28 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
         }
       } catch {
         // Use mock data
-      } finally {
-        setLoading(false);
       }
     }
     fetchServices();
   }, []);
+
+  // Fetch customers from API when branch changes
+  useEffect(() => {
+    async function fetchCustomers() {
+      try {
+        const res = await fetch(`/api/branches/${selectedAdminBranch}/customers`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.customers) {
+            setCustomers(json.customers);
+          }
+        }
+      } catch {
+        // No customers found
+      }
+    }
+    fetchCustomers();
+  }, [selectedAdminBranch]);
 
   // Reset quantity when service changes
   useEffect(() => {
@@ -100,10 +120,30 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isFormValid) return;
+
+    // Additional validation before submission
+    if (!selectedCustomer) {
+      triggerNotification('Pilih pelanggan terlebih dahulu', 'warning');
+      return;
+    }
+    if (!selectedService) {
+      triggerNotification('Pilih layanan terlebih dahulu', 'warning');
+      return;
+    }
+    if (!quantity || parseFloat(quantity) <= 0) {
+      triggerNotification('Masukkan berat/jumlah yang valid', 'warning');
+      return;
+    }
 
     const qty = parseFloat(quantity);
-    const customer = MOCK_CUSTOMERS.find((c) => c.id_pelanggan === selectedCustomer);
+    const customer = customers.find((c) => c.id_pelanggan === selectedCustomer);
+
+    // Validate service exists
+    const selectedSvc = services.find((s) => s.id_layanan === selectedService);
+    if (!selectedSvc) {
+      triggerNotification('Layanan tidak valid. Silakan pilih layanan kembali.', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -111,20 +151,24 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id_pelanggan: selectedCustomer,
-          customer_name: customer?.nama ?? 'Unknown',
-          customer_whatsapp: customer?.whatsapp ?? '',
-          id_layanan: selectedService,
+          id_pelanggan: selectedCustomer.trim(),
+          customer_name: customer?.nama?.trim() ?? 'Unknown',
+          customer_whatsapp: customer?.whatsapp?.trim() ?? '',
+          id_layanan: selectedService.trim(),
+          service_name: selectedSvc.nama_layanan,
           qty: qty,
+          satuan: selectedSvc.satuan,
+          berat_kg: selectedSvc.satuan === 'kg' ? qty : 0,
           total_harga: totalHarga,
           status: 'Diproses',
         }),
       });
 
       const json = await res.json();
+
       if (res.ok && json.success) {
         triggerNotification(
-          `Order berhasil dicatat! Total: ${formatIDR(totalHarga)} (${qty} ${selectedServiceData?.satuan} × ${formatIDR(selectedServiceData?.harga_per_satuan ?? 0)})`,
+          `Order berhasil dicatat! Total: ${formatIDR(totalHarga)} (${qty} ${selectedSvc.satuan} × ${formatIDR(selectedSvc.harga_per_satuan)})`,
           'success'
         );
         // Reset form
@@ -134,19 +178,12 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
       } else {
         triggerNotification(json.error ?? 'Gagal menyimpan order', 'error');
       }
-    } catch {
-      triggerNotification('Tidak dapat terhubung ke server', 'error');
+    } catch (err) {
+      console.error('[OutletReception] Submit error:', err);
+      triggerNotification('Tidak dapat terhubung ke server. Pastikan koneksi internet stabil.', 'error');
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-10 h-10 border-2 border-slate-200 border-t-deep-blue rounded-full animate-spin"></div>
-      </div>
-    );
   }
 
   return (
@@ -181,19 +218,27 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
               Pilih Pelanggan
             </label>
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all"
-              required
-            >
-              <option value="">-- Pilih Pelanggan --</option>
-              {MOCK_CUSTOMERS.map((c) => (
-                <option key={c.id_pelanggan} value={c.id_pelanggan}>
-                  {c.nama} ({c.whatsapp})
-                </option>
-              ))}
-            </select>
+            {customers.length > 0 ? (
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all"
+                required
+              >
+                <option value="">-- Pilih Pelanggan --</option>
+                {customers.map((c) => (
+                  <option key={c.id_pelanggan} value={c.id_pelanggan}>
+                    {c.nama} ({c.whatsapp})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-sm text-amber-700">
+                  ⚠️ Belum ada pelanggan terdaftar. Daftarkan pelanggan terlebih dahulu melalui menu "Input Pelanggan".
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Pilih Layanan */}

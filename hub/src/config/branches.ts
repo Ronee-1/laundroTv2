@@ -1,82 +1,20 @@
+import { prisma } from '../lib/prisma.js';
 import type { Branch } from '@laundrot/shared-types';
+
+// Re-export Branch type for compatibility
+export type { Branch };
 
 export interface BranchWithFinancials extends Branch {
   omzet: number;
   wilayah: string;
 }
 
-export const BRANCHES: BranchWithFinancials[] = [
-  {
-    id_cabang: 'CBG-001',
-    nama_cabang: 'Cabang Depok (Pusat)',
-    alamat: 'Jl. Margonda Raya No. 88, Depok',
-    latitude: -6.3894,
-    longitude: 106.8302,
-    kuota_harian: 30,
-    kuota_terpakai: 0,
-    is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-01-01'),
-    omzet: 24500000,
-    wilayah: 'Depok',
-  },
-  {
-    id_cabang: 'CBG-002',
-    nama_cabang: 'Cabang Jakarta Selatan',
-    alamat: 'Jl. Kemang Raya No. 10, Jakarta Selatan',
-    latitude: -6.2615,
-    longitude: 106.8106,
-    kuota_harian: 30,
-    kuota_terpakai: 0,
-    is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-01-01'),
-    omzet: 18200000,
-    wilayah: 'Jakarta',
-  },
-  {
-    id_cabang: 'CBG-003',
-    nama_cabang: 'Cabang Bekasi Timur',
-    alamat: 'Jl. Rawamangun No. 22, Bekasi Timur',
-    latitude: -6.1903,
-    longitude: 106.8872,
-    kuota_harian: 30,
-    kuota_terpakai: 0,
-    is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-01-01'),
-    omzet: 15400000,
-    wilayah: 'Bekasi',
-  },
-  {
-    id_cabang: 'CBG-004',
-    nama_cabang: 'Cabang Tangerang Kota',
-    alamat: 'Jl. BSD Raya No. 15, Tangerang',
-    latitude: -6.3014,
-    longitude: 106.6527,
-    kuota_harian: 30,
-    kuota_terpakai: 0,
-    is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-01-01'),
-    omzet: 21000000,
-    wilayah: 'Tangerang',
-  },
-  {
-    id_cabang: 'CBG-005',
-    nama_cabang: 'Cabang Bogor Raya',
-    alamat: 'Jl. Pajajaran No. 25, Bogor',
-    latitude: -6.5971,
-    longitude: 106.8060,
-    kuota_harian: 30,
-    kuota_terpakai: 0,
-    is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-01-01'),
-    omzet: 12100000,
-    wilayah: 'Bogor',
-  },
-];
+// ============================================================
+// CACHED DATA - Load from DB, refresh on demand
+// ============================================================
+let cachedBranches: BranchWithFinancials[] | null = null;
+let lastFetchTime: number = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute cache
 
 // Macro financials - Total Konsolidasi Omzet = Rp91.200.000
 export const MACRO_FINANCIALS = {
@@ -84,10 +22,161 @@ export const MACRO_FINANCIALS = {
   batas_anggaran_operasional: 22500000,
 };
 
-export function getActiveBranches(): BranchWithFinancials[] {
-  return BRANCHES.filter((b) => b.is_active);
+// ============================================================
+// DATABASE FUNCTIONS
+// ============================================================
+
+/**
+ * Fetch all branches from database
+ */
+export async function fetchBranchesFromDB(): Promise<BranchWithFinancials[]> {
+  const branches = await prisma.branch.findMany({
+    where: { is_active: true },
+    orderBy: { id_cabang: 'asc' },
+  });
+
+  return branches.map((b) => ({
+    id_cabang: b.id_cabang,
+    nama_cabang: b.nama_cabang,
+    alamat: b.alamat,
+    latitude: b.latitude,
+    longitude: b.longitude,
+    kuota_harian: b.kuota_harian,
+    kuota_terpakai: b.kuota_terpakai,
+    is_active: b.is_active,
+    created_at: b.created_at,
+    updated_at: b.updated_at,
+    omzet: b.omzet,
+    wilayah: b.wilayah,
+  }));
 }
 
-export function getBranchById(id_cabang: string): BranchWithFinancials | undefined {
-  return BRANCHES.find((b) => b.id_cabang === id_cabang);
+/**
+ * Get branch by ID from database
+ */
+export async function fetchBranchByIdFromDB(id_cabang: string): Promise<BranchWithFinancials | null> {
+  const branch = await prisma.branch.findUnique({
+    where: { id_cabang },
+  });
+
+  if (!branch) return null;
+
+  return {
+    id_cabang: branch.id_cabang,
+    nama_cabang: branch.nama_cabang,
+    alamat: branch.alamat,
+    latitude: branch.latitude,
+    longitude: branch.longitude,
+    kuota_harian: branch.kuota_harian,
+    kuota_terpakai: branch.kuota_terpakai,
+    is_active: branch.is_active,
+    created_at: branch.created_at,
+    updated_at: branch.updated_at,
+    omzet: branch.omzet,
+    wilayah: branch.wilayah,
+  };
+}
+
+// ============================================================
+// CACHED ACCESSORS (for backward compatibility)
+// ============================================================
+
+/**
+ * Get all active branches - uses cache with DB refresh
+ */
+export async function getActiveBranches(): Promise<BranchWithFinancials[]> {
+  const now = Date.now();
+  if (!cachedBranches || now - lastFetchTime > CACHE_TTL_MS) {
+    cachedBranches = await fetchBranchesFromDB();
+    lastFetchTime = now;
+  }
+  return cachedBranches;
+}
+
+/**
+ * Get branch by ID - uses cache with DB refresh
+ */
+export async function getBranchById(id_cabang: string): Promise<BranchWithFinancials | null> {
+  // Check cache first
+  const now = Date.now();
+  if (cachedBranches && now - lastFetchTime <= CACHE_TTL_MS) {
+    return cachedBranches.find((b) => b.id_cabang === id_cabang) ?? null;
+  }
+  // Fallback to direct DB query
+  return fetchBranchByIdFromDB(id_cabang);
+}
+
+/**
+ * Refresh the branches cache (call after mutations)
+ */
+export async function refreshBranchesCache(): Promise<void> {
+  cachedBranches = await fetchBranchesFromDB();
+  lastFetchTime = Date.now();
+}
+
+/**
+ * Get all branches (including inactive) - for admin purposes
+ */
+export async function getAllBranches(): Promise<BranchWithFinancials[]> {
+  const branches = await prisma.branch.findMany({
+    orderBy: { id_cabang: 'asc' },
+  });
+
+  return branches.map((b) => ({
+    id_cabang: b.id_cabang,
+    nama_cabang: b.nama_cabang,
+    alamat: b.alamat,
+    latitude: b.latitude,
+    longitude: b.longitude,
+    kuota_harian: b.kuota_harian,
+    kuota_terpakai: b.kuota_terpakai,
+    is_active: b.is_active,
+    created_at: b.created_at,
+    updated_at: b.updated_at,
+    omzet: b.omzet,
+    wilayah: b.wilayah,
+  }));
+}
+
+/**
+ * Update branch quota (daily limit usage)
+ */
+export async function updateBranchQuota(
+  id_cabang: string,
+  perubahan: number // +1 untuk pakai, -1 untuk reset
+): Promise<void> {
+  await prisma.branch.update({
+    where: { id_cabang },
+    data: {
+      kuota_terpakai: {
+        increment: perubahan,
+      },
+    },
+  });
+  // Invalidate cache
+  await refreshBranchesCache();
+}
+
+/**
+ * Update branch omzet
+ */
+export async function updateBranchOmzet(id_cabang: string, nominal: number): Promise<void> {
+  await prisma.branch.update({
+    where: { id_cabang },
+    data: {
+      omzet: {
+        increment: nominal,
+      },
+    },
+  });
+  // Invalidate cache
+  await refreshBranchesCache();
+}
+
+/**
+ * Initialize cache on startup
+ */
+export async function initializeBranchesCache(): Promise<void> {
+  await refreshBranchesCache();
+  console.log('[branches] Cache initialized with', cachedBranches?.length, 'branches');
 }

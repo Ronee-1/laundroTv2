@@ -5,6 +5,8 @@
 // Mendukung indikator sukses: Selisih kas = Rp0
 // ==========================================
 
+import { prisma } from '../lib/prisma.js';
+
 export type ApprovalStatus = 'Pending' | 'Disetujui' | 'Ditolak';
 
 export interface ReconciliationLog {
@@ -21,76 +23,252 @@ export interface ReconciliationLog {
   created_at: Date;
 }
 
-const RECONCILIATION_LOGS: ReconciliationLog[] = [];
+// ==========================================
+// RECONCILIATION CRUD OPERATIONS
+// ==========================================
 
-export function createReconciliation(params: {
+/**
+ * Create new reconciliation log
+ */
+export async function createReconciliation(params: {
   id_cabang: string;
   kas_digital: number;
   kas_fisik: number;
   catatan?: string;
-}): ReconciliationLog {
+}): Promise<ReconciliationLog> {
+  const id_rekonsiliasi = `REC-${Date.now().toString(36).toUpperCase()}`;
   const selisih = params.kas_fisik - params.kas_digital;
-  const log: ReconciliationLog = {
-    id_rekonsiliasi: `REC-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-    id_cabang: params.id_cabang,
-    tanggal: new Date(),
-    kas_digital: params.kas_digital,
-    kas_fisik: params.kas_fisik,
-    selisih,
-    status: selisih === 0 ? 'Cocok' : 'Selisih',
-    approval_status: 'Pending',
-    catatan: params.catatan,
-    created_at: new Date(),
+
+  const log = await prisma.reconciliationLog.create({
+    data: {
+      id_rekonsiliasi,
+      id_cabang: params.id_cabang,
+      kas_digital: params.kas_digital,
+      kas_fisik: params.kas_fisik,
+      selisih,
+      status: selisih === 0 ? 'Cocok' : 'Selisih',
+      approval_status: 'Pending',
+      catatan: params.catatan,
+    },
+  });
+
+  return {
+    id_rekonsiliasi: log.id_rekonsiliasi,
+    id_cabang: log.id_cabang,
+    tanggal: log.tanggal,
+    kas_digital: log.kas_digital,
+    kas_fisik: log.kas_fisik,
+    selisih: log.selisih,
+    status: log.status as 'Cocok' | 'Selisih',
+    approval_status: log.approval_status as ApprovalStatus,
+    catatan: log.catatan ?? undefined,
+    catatan_owner: log.catatan_owner ?? undefined,
+    created_at: log.created_at,
   };
-
-  RECONCILIATION_LOGS.push(log);
-  return log;
 }
 
-export function getReconciliationByBranch(id_cabang: string): ReconciliationLog[] {
-  return RECONCILIATION_LOGS.filter((log) => log.id_cabang === id_cabang);
+/**
+ * Get reconciliation logs by branch
+ */
+export async function getReconciliationByBranch(id_cabang: string): Promise<ReconciliationLog[]> {
+  const logs = await prisma.reconciliationLog.findMany({
+    where: { id_cabang },
+    orderBy: { tanggal: 'desc' },
+  });
+
+  return logs.map((log) => ({
+    id_rekonsiliasi: log.id_rekonsiliasi,
+    id_cabang: log.id_cabang,
+    tanggal: log.tanggal,
+    kas_digital: log.kas_digital,
+    kas_fisik: log.kas_fisik,
+    selisih: log.selisih,
+    status: log.status as 'Cocok' | 'Selisih',
+    approval_status: log.approval_status as ApprovalStatus,
+    catatan: log.catatan ?? undefined,
+    catatan_owner: log.catatan_owner ?? undefined,
+    created_at: log.created_at,
+  }));
 }
 
-export function getAllReconciliations(): ReconciliationLog[] {
-  return [...RECONCILIATION_LOGS];
+/**
+ * Get all reconciliations
+ */
+export async function getAllReconciliations(): Promise<ReconciliationLog[]> {
+  const logs = await prisma.reconciliationLog.findMany({
+    orderBy: { tanggal: 'desc' },
+  });
+
+  return logs.map((log) => ({
+    id_rekonsiliasi: log.id_rekonsiliasi,
+    id_cabang: log.id_cabang,
+    tanggal: log.tanggal,
+    kas_digital: log.kas_digital,
+    kas_fisik: log.kas_fisik,
+    selisih: log.selisih,
+    status: log.status as 'Cocok' | 'Selisih',
+    approval_status: log.approval_status as ApprovalStatus,
+    catatan: log.catatan ?? undefined,
+    catatan_owner: log.catatan_owner ?? undefined,
+    created_at: log.created_at,
+  }));
 }
 
-export function getLatestReconciliation(id_cabang: string): ReconciliationLog | undefined {
-  const logs = getReconciliationByBranch(id_cabang);
-  return logs.length > 0 ? logs[logs.length - 1] : undefined;
+/**
+ * Get latest reconciliation for a branch
+ */
+export async function getLatestReconciliation(id_cabang: string): Promise<ReconciliationLog | null> {
+  const log = await prisma.reconciliationLog.findFirst({
+    where: { id_cabang },
+    orderBy: { tanggal: 'desc' },
+  });
+
+  if (!log) return null;
+
+  return {
+    id_rekonsiliasi: log.id_rekonsiliasi,
+    id_cabang: log.id_cabang,
+    tanggal: log.tanggal,
+    kas_digital: log.kas_digital,
+    kas_fisik: log.kas_fisik,
+    selisih: log.selisih,
+    status: log.status as 'Cocok' | 'Selisih',
+    approval_status: log.approval_status as ApprovalStatus,
+    catatan: log.catatan ?? undefined,
+    catatan_owner: log.catatan_owner ?? undefined,
+    created_at: log.created_at,
+  };
 }
 
-export function getReconciliationById(id_rekonsiliasi: string): ReconciliationLog | undefined {
-  return RECONCILIATION_LOGS.find((log) => log.id_rekonsiliasi === id_rekonsiliasi);
+/**
+ * Get reconciliation by ID
+ */
+export async function getReconciliationById(id_rekonsiliasi: string): Promise<ReconciliationLog | null> {
+  const log = await prisma.reconciliationLog.findUnique({
+    where: { id_rekonsiliasi },
+  });
+
+  if (!log) return null;
+
+  return {
+    id_rekonsiliasi: log.id_rekonsiliasi,
+    id_cabang: log.id_cabang,
+    tanggal: log.tanggal,
+    kas_digital: log.kas_digital,
+    kas_fisik: log.kas_fisik,
+    selisih: log.selisih,
+    status: log.status as 'Cocok' | 'Selisih',
+    approval_status: log.approval_status as ApprovalStatus,
+    catatan: log.catatan ?? undefined,
+    catatan_owner: log.catatan_owner ?? undefined,
+    created_at: log.created_at,
+  };
 }
 
-export function approveReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null {
-  const log = getReconciliationById(id_rekonsiliasi);
-  if (!log || log.approval_status !== 'Pending') return null;
-  log.approval_status = 'Disetujui';
-  log.catatan_owner = catatan_owner;
-  return log;
+/**
+ * Approve reconciliation
+ */
+export async function approveReconciliation(id_rekonsiliasi: string, catatan_owner?: string): Promise<ReconciliationLog | null> {
+  try {
+    const log = await prisma.reconciliationLog.update({
+      where: { id_rekonsiliasi },
+      data: {
+        approval_status: 'Disetujui',
+        catatan_owner,
+      },
+    });
+
+    return {
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      id_cabang: log.id_cabang,
+      tanggal: log.tanggal,
+      kas_digital: log.kas_digital,
+      kas_fisik: log.kas_fisik,
+      selisih: log.selisih,
+      status: log.status as 'Cocok' | 'Selisih',
+      approval_status: log.approval_status as ApprovalStatus,
+      catatan: log.catatan ?? undefined,
+      catatan_owner: log.catatan_owner ?? undefined,
+      created_at: log.created_at,
+    };
+  } catch {
+    return null;
+  }
 }
 
-export function rejectReconciliation(id_rekonsiliasi: string, catatan_owner?: string): ReconciliationLog | null {
-  const log = getReconciliationById(id_rekonsiliasi);
-  if (!log || log.approval_status !== 'Pending') return null;
-  log.approval_status = 'Ditolak';
-  log.catatan_owner = catatan_owner;
-  return log;
+/**
+ * Reject reconciliation
+ */
+export async function rejectReconciliation(id_rekonsiliasi: string, catatan_owner?: string): Promise<ReconciliationLog | null> {
+  try {
+    const log = await prisma.reconciliationLog.update({
+      where: { id_rekonsiliasi },
+      data: {
+        approval_status: 'Ditolak',
+        catatan_owner,
+      },
+    });
+
+    return {
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      id_cabang: log.id_cabang,
+      tanggal: log.tanggal,
+      kas_digital: log.kas_digital,
+      kas_fisik: log.kas_fisik,
+      selisih: log.selisih,
+      status: log.status as 'Cocok' | 'Selisih',
+      approval_status: log.approval_status as ApprovalStatus,
+      catatan: log.catatan ?? undefined,
+      catatan_owner: log.catatan_owner ?? undefined,
+      created_at: log.created_at,
+    };
+  } catch {
+    return null;
+  }
 }
 
-export function overrideReconciliation(
+/**
+ * Override reconciliation (adjust values)
+ */
+export async function overrideReconciliation(
   id_rekonsiliasi: string,
   new_kas_fisik: number,
   catatan_owner?: string,
-): ReconciliationLog | null {
-  const log = getReconciliationById(id_rekonsiliasi);
-  if (!log) return null;
-  log.kas_fisik = new_kas_fisik;
-  log.selisih = new_kas_fisik - log.kas_digital;
-  log.status = log.selisih === 0 ? 'Cocok' : 'Selisih';
-  log.approval_status = 'Pending';
-  log.catatan_owner = catatan_owner ?? log.catatan_owner;
-  return log;
+): Promise<ReconciliationLog | null> {
+  try {
+    const existing = await prisma.reconciliationLog.findUnique({
+      where: { id_rekonsiliasi },
+    });
+
+    if (!existing) return null;
+
+    const selisih = new_kas_fisik - existing.kas_digital;
+
+    const log = await prisma.reconciliationLog.update({
+      where: { id_rekonsiliasi },
+      data: {
+        kas_fisik: new_kas_fisik,
+        selisih,
+        status: selisih === 0 ? 'Cocok' : 'Selisih',
+        approval_status: 'Pending',
+        catatan_owner: catatan_owner ?? existing.catatan_owner ?? undefined,
+      },
+    });
+
+    return {
+      id_rekonsiliasi: log.id_rekonsiliasi,
+      id_cabang: log.id_cabang,
+      tanggal: log.tanggal,
+      kas_digital: log.kas_digital,
+      kas_fisik: log.kas_fisik,
+      selisih: log.selisih,
+      status: log.status as 'Cocok' | 'Selisih',
+      approval_status: log.approval_status as ApprovalStatus,
+      catatan: log.catatan ?? undefined,
+      catatan_owner: log.catatan_owner ?? undefined,
+      created_at: log.created_at,
+    };
+  } catch {
+    return null;
+  }
 }

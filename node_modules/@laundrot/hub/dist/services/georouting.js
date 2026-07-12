@@ -17,8 +17,8 @@ function haversineDistance(a, b) {
     const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
     return R * c;
 }
-function findNearestBranch(customerCoords) {
-    const branches = (0, branches_js_1.getActiveBranches)();
+async function findNearestBranch(customerCoords) {
+    const branches = await (0, branches_js_1.getActiveBranches)();
     if (branches.length === 0)
         return null;
     let nearest = null;

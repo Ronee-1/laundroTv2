@@ -1,17 +1,24 @@
-import { useState, useCallback } from 'react';
-import { Sidebar } from './components/Sidebar.tsx';
-import { TugasHarian } from './components/TugasHarian.tsx';
-import { DashboardEksekutif } from './components/DashboardEksekutif.tsx';
-import { DashboardAdmin } from './components/DashboardAdmin.tsx';
-import { ExpenseForm } from './components/ExpenseForm.tsx';
-import { AuditRekonsiliasi } from './components/AuditRekonsiliasi.tsx';
-import { InventarisPemantau } from './components/InventarisPemantau.tsx';
-import { DashboardKurir } from './components/DashboardKurir.tsx';
-import { InputPelanggan } from './components/InputPelanggan.tsx';
-import { WhatsAppOrderHub } from './components/WhatsAppOrderHub.tsx';
-import { IncomingOrders } from './components/IncomingOrders.tsx';
-import { CourierAssignment } from './components/CourierAssignment.tsx';
-import { OutletReception } from './components/OutletReception.tsx';
+/**
+ * LaundroTruck - Branch Application
+ * Main App Component with Authentication Integration
+ */
+
+import { useState, useCallback, useEffect } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginPage } from './components/LoginPage';
+import { Sidebar } from './components/Sidebar';
+import { TugasHarian } from './components/TugasHarian';
+import { DashboardEksekutif } from './components/DashboardEksekutif';
+import { DashboardAdmin } from './components/DashboardAdmin';
+import { ExpenseForm } from './components/ExpenseForm';
+import { AuditRekonsiliasi } from './components/AuditRekonsiliasi';
+import { InventarisPemantau } from './components/InventarisPemantau';
+import { DashboardKurir } from './components/DashboardKurir';
+import { InputPelanggan } from './components/InputPelanggan';
+import { WhatsAppOrderHub } from './components/WhatsAppOrderHub';
+import { IncomingOrders } from './components/IncomingOrders';
+import { CourierAssignment } from './components/CourierAssignment';
+import { OutletReception } from './components/OutletReception';
 
 // ==========================================
 // PAGE TYPES - FR-LOG-02, FR-SERVICE-01 Integration
@@ -21,7 +28,7 @@ import { OutletReception } from './components/OutletReception.tsx';
 // 'outlet-reception' = FR-SERVICE-01: Input layanan dengan kalkulasi otomatis
 // ==========================================
 export type Page = 'tugas' | 'dashboard' | 'admin-dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir' | 'input-pelanggan' | 'whatsapp-hub' | 'incoming-orders' | 'courier-assignment' | 'outlet-reception';
-export type UserRole = 'Owner' | 'Admin Cabang' | 'Kurir Logistik';
+export type UserRole = 'Owner' | 'Admin' | 'Kurir';
 
 export interface Notification {
   message: string;
@@ -30,94 +37,9 @@ export interface Notification {
 
 const ROLE_DEFAULT_PAGE: Record<UserRole, Page> = {
   Owner: 'dashboard',
-  'Admin Cabang': 'admin-dashboard',
-  'Kurir Logistik': 'kurir',
+  Admin: 'admin-dashboard',
+  Kurir: 'kurir',
 };
-
-// ============================================
-// LOGIN PORTAL - Material Design 3
-// ============================================
-function LoginPortal({ onLogin }: { onLogin: (role: UserRole) => void }) {
-  const roles: { role: UserRole; title: string; description: string; icon: React.ReactNode }[] = [
-    {
-      role: 'Owner',
-      title: 'Pemilik Bisnis',
-      description: 'Akses penuh dashboard, keuangan multi-cabang, logistik & audit terpusat',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      ),
-    },
-    {
-      role: 'Admin Cabang',
-      title: 'Admin Cabang',
-      description: 'Kelola stok, audit kas blind-input, verifikasi logistik & input pelanggan',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
-    },
-    {
-      role: 'Kurir Logistik',
-      title: 'Kurir Logistik',
-      description: 'Tugas antar-jemput pelanggan & pengiriman operasional antar cabang',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-        </svg>
-      ),
-    },
-  ];
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ backgroundColor: '#f8f9ff' }}>
-      {/* Logo & Branding - Material Design 3 */}
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6" style={{ backgroundColor: '#15157d' }}>
-          <svg className="w-8 h-8" style={{ color: '#14b8a6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-          </svg>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight" style={{ color: '#15157d' }}>LaundroTruck</h1>
-        <p className="text-sm mt-2" style={{ color: '#464652' }}>Sistem Multi-Cabang — Pilih peran Anda</p>
-      </div>
-
-      {/* Role Selection Cards - Material Design 3 */}
-      <div className="w-full max-w-md space-y-3">
-        {roles.map((item) => (
-          <button
-            key={item.role}
-            onClick={() => onLogin(item.role)}
-            className="w-full flex items-center gap-4 p-5 rounded-2xl transition-all duration-200 text-left group hover:scale-[1.02]"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.85)',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid #c7c5d4'
-            }}
-          >
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all"
-              style={{ backgroundColor: '#ccfbf1', color: '#0d9488' }}
-            >
-              {item.icon}
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold" style={{ color: '#0b1c30' }}>{item.title}</h3>
-              <p className="text-sm mt-0.5" style={{ color: '#464652' }}>{item.description}</p>
-            </div>
-            <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" style={{ color: '#464652' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        ))}
-      </div>
-
-      <p className="text-xs mt-12" style={{ color: '#777683' }}>Laundro Truck v2.0 — Hub-and-Spoke Architecture</p>
-    </div>
-  );
-}
 
 // ============================================
 // NOTIFICATION TOAST - Material Design 3
@@ -142,45 +64,83 @@ function NotificationToast({ notification, onClose }: { notification: Notificati
 }
 
 // ============================================
-// MAIN APP - Material Design 3
+// BRANCH SELECTOR COMPONENT
 // ============================================
-function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+interface BranchSelectorProps {
+  selectedBranch: string;
+  onBranchChange: (branch: string) => void;
+}
+
+function BranchSelector({ selectedBranch, onBranchChange }: BranchSelectorProps) {
+  const branches = [
+    { id: 'CBG-001', nama: 'Depok (Pusat)' },
+    { id: 'CBG-002', nama: 'Jakarta Selatan' },
+    { id: 'CBG-003', nama: 'Bekasi Timur' },
+    { id: 'CBG-004', nama: 'Tangerang Kota' },
+    { id: 'CBG-005', nama: 'Bogor Raya' },
+  ];
+
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ backgroundColor: '#eff4ff', border: '1px solid #c7c5d4' }}>
+      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0056c6' }}></span>
+      <select
+        value={selectedBranch}
+        onChange={(e) => onBranchChange(e.target.value)}
+        className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
+        style={{ color: '#0b1c30' }}
+      >
+        {branches.map((branch) => (
+          <option key={branch.id} value={branch.id}>
+            {branch.id} - {branch.nama}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ============================================
+// MAIN APP CONTENT (Authenticated)
+// ============================================
+function AppContent() {
+  const { isAuthenticated, user, logout } = useAuth();
   const [page, setPage] = useState<Page>('dashboard');
-  const [userRole, setUserRole] = useState<UserRole>('Owner');
   const [selectedAdminBranch, setSelectedAdminBranch] = useState('CBG-002');
   const [notification, setNotification] = useState<Notification | null>(null);
+
+  // Initialize page based on user role
+  useEffect(() => {
+    if (user) {
+      const role = user.role as UserRole;
+      setPage(ROLE_DEFAULT_PAGE[role] || 'dashboard');
+
+      // Set default branch based on user's assigned branch
+      if (user.id_cabang) {
+        setSelectedAdminBranch(user.id_cabang);
+      }
+    }
+  }, [user]);
 
   const triggerNotification = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
   }, []);
 
-  function handleLogin(role: UserRole) {
-    setUserRole(role);
-    setPage(ROLE_DEFAULT_PAGE[role]);
-    setIsLoggedIn(true);
-    triggerNotification(`Selamat datang! Anda masuk sebagai ${role}.`, 'success');
-  }
-
-  function handleLogout() {
-    setIsLoggedIn(false);
-    setUserRole('Owner');
-    setPage('dashboard');
-    triggerNotification('Anda telah keluar.', 'success');
-  }
-
   // Login Screen
-  if (!isLoggedIn) {
+  if (!isAuthenticated) {
     return (
       <>
-        <LoginPortal onLogin={handleLogin} />
+        <LoginPage onSuccess={() => {}} />
         {notification && (
           <NotificationToast notification={notification} onClose={() => setNotification(null)} />
         )}
       </>
     );
   }
+
+  // Get user role for display
+  const userRole = (user?.role as UserRole) || 'Owner';
+  const userName = user?.nama || 'User';
 
   // Main Application - Material Design 3
   return (
@@ -207,32 +167,27 @@ function App() {
         </div>
 
         <div className="flex items-center gap-6">
+          {/* Branch Selector - Only for Admin */}
+          {userRole === 'Admin' && (
+            <BranchSelector
+              selectedBranch={selectedAdminBranch}
+              onBranchChange={(branch) => {
+                setSelectedAdminBranch(branch);
+                triggerNotification('Cabang aktif diubah.', 'success');
+              }}
+            />
+          )}
+
+          {/* User Info */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ backgroundColor: '#eff4ff', border: '1px solid #c7c5d4' }}>
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0056c6' }}></span>
-            <span className="text-sm font-medium" style={{ color: '#0b1c30' }}>{userRole}</span>
-            {userRole === 'Admin Cabang' && (
-              <>
-                <span style={{ color: '#c7c5d4' }}>|</span>
-                <select
-                  value={selectedAdminBranch}
-                  onChange={(e) => {
-                    setSelectedAdminBranch(e.target.value);
-                    triggerNotification('Cabang aktif diubah.', 'success');
-                  }}
-                  className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer"
-                  style={{ color: '#0b1c30' }}
-                >
-                  <option value="CBG-001">Depok (Pusat)</option>
-                  <option value="CBG-002">Jakarta Selatan</option>
-                  <option value="CBG-003">Bekasi Timur</option>
-                  <option value="CBG-004">Tangerang Kota</option>
-                  <option value="CBG-005">Bogor Raya</option>
-                </select>
-              </>
-            )}
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#10b981' }}></span>
+            <span className="text-sm font-medium" style={{ color: '#0b1c30' }}>{userName}</span>
+            <span style={{ color: '#c7c5d4' }}>|</span>
+            <span className="text-sm font-medium" style={{ color: '#464652' }}>{userRole}</span>
           </div>
+
           <button
-            onClick={handleLogout}
+            onClick={logout}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-all"
             style={{
               color: '#464652',
@@ -327,6 +282,17 @@ function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+// ============================================
+// APP WRAPPER WITH AUTH PROVIDER
+// ============================================
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

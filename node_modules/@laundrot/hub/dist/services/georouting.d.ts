@@ -8,6 +8,6 @@ export interface GeoroutingResult {
     branch: Branch;
     distance_km: number;
 }
-export declare function findNearestBranch(customerCoords: Coordinates): GeoroutingResult | null;
+export declare function findNearestBranch(customerCoords: Coordinates): Promise<GeoroutingResult | null>;
 export {};
 //# sourceMappingURL=georouting.d.ts.map

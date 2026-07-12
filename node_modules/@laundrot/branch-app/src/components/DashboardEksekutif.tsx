@@ -29,10 +29,20 @@ function CashFlowChart({
   budgetThreshold?: number;
   branchFilter?: string;
 }) {
-  const maxValue = Math.max(...monthlyData.income, ...monthlyData.expense, budgetThreshold, 1);
+  const hasAnyData = monthlyData.income.some(v => v > 0) || monthlyData.expense.some(v => v > 0);
+
+  // Calculate proper max value for scaling, ensure at least 1 to avoid division by zero
+  const maxIncome = Math.max(...monthlyData.income, 0);
+  const maxExpense = Math.max(...monthlyData.expense, 0);
+  const maxValue = Math.max(maxIncome, maxExpense, budgetThreshold, 1);
 
   const budgetLinePosition = budgetThreshold > 0 ? (1 - (budgetThreshold / maxValue)) * 100 : null;
+
+  // Find months where expense exceeds budget threshold
   const budgetMonthsOverThreshold = monthlyData.expense.map((exp) => exp > budgetThreshold);
+
+  // Find the month with highest expense for highlighting
+  const maxExpenseIndex = monthlyData.expense.indexOf(maxExpense);
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-200">
@@ -60,6 +70,18 @@ function CashFlowChart({
           </div>
         )}
       </div>
+
+      {!hasAnyData ? (
+        <div className="flex items-center justify-center h-48 text-slate-400">
+          <div className="text-center">
+            <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p className="text-sm">Tidak ada data arus kas</p>
+            <p className="text-xs mt-1">Pilih branch dengan data transaksi</p>
+          </div>
+        </div>
+      ) : (
       <div className="relative flex items-end gap-2 h-48">
         {budgetLinePosition !== null && (
           <div
@@ -78,20 +100,21 @@ function CashFlowChart({
           const incomeHeight = maxValue > 0 ? (incomeVal / maxValue) * 100 : 0;
           const expenseHeight = maxValue > 0 ? (expenseVal / maxValue) * 100 : 0;
           const isOverBudget = budgetMonthsOverThreshold[i];
+          const isHighestExpense = i === maxExpenseIndex && maxExpense > budgetThreshold;
 
           return (
             <div key={label} className="flex-1 flex flex-col items-center gap-1">
               <div className="w-full flex items-end gap-0.5 h-36 relative">
                 {isOverBudget && (
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-rose-500 text-xs">⚠️</div>
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-rose-500 text-xs" title={`Melebihi budget: ${formatIDR(expenseVal - budgetThreshold)}`}>⚠️</div>
                 )}
                 <div className="w-1/2 relative group/bar">
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/bar:block bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap z-20">
                     {formatIDR(incomeVal)}
                   </div>
                   <div
-                    className={`w-full rounded-t-sm transition-all hover:bg-emerald-600 ${incomeVal === 0 ? 'opacity-30' : ''}`}
-                    style={{ height: `${incomeHeight}%`, backgroundColor: incomeVal === 0 ? '#d1d5db' : undefined }}
+                    className={`w-full rounded-t-sm transition-all hover:bg-emerald-600 ${incomeVal === 0 ? 'bg-slate-200' : 'bg-emerald-500'}`}
+                    style={{ height: `${Math.max(incomeHeight, incomeVal > 0 ? 2 : 0)}%` }}
                   ></div>
                 </div>
                 <div className="w-1/2 relative group/bar">
@@ -99,18 +122,26 @@ function CashFlowChart({
                     {formatIDR(expenseVal)}
                   </div>
                   <div
-                    className={`w-full rounded-t-sm transition-all hover:bg-rose-600 ${isOverBudget ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
-                    style={{ height: `${expenseHeight}%` }}
+                    className={`w-full rounded-t-sm transition-all hover:bg-rose-600 ${isHighestExpense ? 'ring-2 ring-rose-500 ring-offset-1' : ''} ${expenseVal === 0 ? 'bg-slate-200' : 'bg-rose-500'}`}
+                    style={{ height: `${Math.max(expenseHeight, expenseVal > 0 ? 2 : 0)}%` }}
                   ></div>
                 </div>
               </div>
-              <span className={`text-[10px] ${isOverBudget ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
+              <span className={`text-[10px] ${isHighestExpense ? 'text-rose-600 font-bold' : isOverBudget ? 'text-rose-600 font-medium' : 'text-slate-400'}`}>
                 {label}
               </span>
             </div>
           );
         })}
       </div>
+      )}
+      {/* Summary stats */}
+      {hasAnyData && (
+        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-500">
+          <span>Total Pemasukan: <strong className="text-emerald-600">{formatIDR(monthlyData.income.reduce((a, b) => a + b, 0))}</strong></span>
+          <span>Total Pengeluaran: <strong className="text-rose-600">{formatIDR(monthlyData.expense.reduce((a, b) => a + b, 0))}</strong></span>
+        </div>
+      )}
     </div>
   );
 }
@@ -164,18 +195,40 @@ function MonthlyTrendChart({
   budgetThreshold?: number;
   branchFilter?: string;
 }) {
+  const hasAnyData = trendData.profit.some(v => v !== 0);
   const maxProfit = Math.max(...trendData.profit);
   const minProfit = Math.min(...trendData.profit);
-  const range = maxProfit - minProfit;
+
+  // Handle negative values properly - expand range to include negative
+  const hasNegativeValues = minProfit < 0;
+  const profitRange = maxProfit - minProfit;
+  const chartPadding = profitRange * 0.1; // 10% padding top and bottom
+
+  // Calculate the effective range for chart scaling
+  const effectiveMax = maxProfit + chartPadding;
+  const effectiveMin = hasNegativeValues ? minProfit - chartPadding : 0;
+  const effectiveRange = effectiveMax - effectiveMin;
+
+  // Find the month with lowest profit (for highlighting worst month)
+  const lowestProfitIndex = trendData.profit.indexOf(minProfit);
+  const isLowestProfitNegative = minProfit < 0;
 
   const points = trendData.profit.map((val, i) => {
     const x = (i / (trendData.profit.length - 1)) * 100;
-    const y = range > 0 ? 100 - ((val - minProfit) / range) * 80 : 50;
+    // Normalize value to 0-100 range accounting for negative values
+    const y = effectiveRange > 0 ? 100 - ((val - effectiveMin) / effectiveRange) * 100 : 50;
     return `${x},${y}`;
   }).join(' ');
 
   // Calculate budget line position (convert to chart coordinates)
-  const budgetY = range > 0 ? 100 - ((budgetThreshold - minProfit) / range) * 80 : 50;
+  const budgetY = effectiveRange > 0 && budgetThreshold > 0 && effectiveMax > 0
+    ? 100 - ((budgetThreshold - effectiveMin) / effectiveRange) * 100
+    : 50;
+
+  // Calculate zero line position if we have negative values
+  const zeroLineY = hasNegativeValues && effectiveRange > 0
+    ? 100 - ((0 - effectiveMin) / effectiveRange) * 100
+    : null;
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-200">
@@ -187,6 +240,18 @@ function MonthlyTrendChart({
           </span>
         )}
       </div>
+
+      {!hasAnyData ? (
+        <div className="flex items-center justify-center h-48 text-slate-400">
+          <div className="text-center">
+            <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <p className="text-sm">Tidak ada data profit</p>
+            <p className="text-xs mt-1">Pilih branch dengan data transaksi</p>
+          </div>
+        </div>
+      ) : (
       <div className="relative h-48">
         {/* Grid lines */}
         <div className="absolute inset-0 flex flex-col justify-between">
@@ -196,6 +261,18 @@ function MonthlyTrendChart({
         </div>
         {/* SVG Line Chart */}
         <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {/* Zero line for negative values */}
+          {zeroLineY !== null && zeroLineY >= 0 && zeroLineY <= 100 && (
+            <line
+              x1="0"
+              y1={zeroLineY}
+              x2="100"
+              y2={zeroLineY}
+              stroke="#94a3b8"
+              strokeWidth="0.3"
+              strokeDasharray="1,1"
+            />
+          )}
           {/* Budget Threshold Line - PRD v2.0 */}
           {budgetThreshold > 0 && (
             <line
@@ -208,9 +285,9 @@ function MonthlyTrendChart({
               strokeDasharray="2,1"
             />
           )}
-          {/* Area fill */}
+          {/* Area fill - only for positive values area */}
           <polygon
-            points={`0,100 ${points} 100,100`}
+            points={`0,${zeroLineY ?? 100} ${points} 100,${zeroLineY ?? 100}`}
             fill="url(#profitGradient)"
             opacity="0.3"
           />
@@ -232,16 +309,16 @@ function MonthlyTrendChart({
           {/* Data points */}
           {trendData.profit.map((val, i) => {
             const x = (i / (trendData.profit.length - 1)) * 100;
-            const y = range > 0 ? 100 - ((val - minProfit) / range) * 80 : 50;
-            const isMay = i === 4;
+            const y = effectiveRange > 0 ? 100 - ((val - effectiveMin) / effectiveRange) * 100 : 50;
+            const isWorstMonth = i === lowestProfitIndex;
             return (
               <g key={i}>
                 <circle
                   cx={x}
                   cy={y}
-                  r={isMay ? "3" : "2"}
-                  fill={isMay ? "#ef4444" : "#0056c6"}
-                  stroke={isMay ? "#fca5a5" : "none"}
+                  r={isWorstMonth ? "3" : "2"}
+                  fill={isWorstMonth ? (isLowestProfitNegative ? "#ef4444" : "#f59e0b") : "#0056c6"}
+                  stroke={isWorstMonth ? "#fca5a5" : "none"}
                   strokeWidth="0.5"
                   vectorEffect="non-scaling-stroke"
                 />
@@ -252,7 +329,7 @@ function MonthlyTrendChart({
                   fill="transparent"
                   className="cursor-pointer"
                 >
-                  <title>{trendData.labels[i]}: {formatIDR(val)}</title>
+                  <title>{trendData.labels[i]}: {formatIDR(val)}{isWorstMonth ? ' (Terendah)' : ''}</title>
                 </circle>
               </g>
             );
@@ -267,29 +344,47 @@ function MonthlyTrendChart({
             Budget
           </div>
         )}
+        {/* Zero line label */}
+        {zeroLineY !== null && zeroLineY >= 0 && zeroLineY <= 100 && (
+          <div
+            className="absolute left-2 text-[9px] text-slate-400"
+            style={{ top: `${zeroLineY}%`, transform: 'translateY(-50%)' }}
+          >
+            0
+          </div>
+        )}
         {/* X-axis labels */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-between">
           {trendData.labels.map((label, i) => (
             <span
               key={label}
-              className={`text-[10px] ${i === 4 ? 'text-rose-600 font-medium' : 'text-slate-400'}`}
+              className={`text-[10px] ${i === lowestProfitIndex ? (isLowestProfitNegative ? 'text-rose-600 font-bold' : 'text-amber-600 font-medium') : 'text-slate-400'}`}
             >
               {label}
             </span>
           ))}
         </div>
       </div>
-      {/* PRD Context Note */}
-      <div className="mt-2 text-[10px] text-slate-400 italic">
-        * Penurunan Mei sesuai konteks: 3/5 cabang mengalami stockout (PRD v2.0)
-      </div>
+      )}
+      {/* Dynamic note based on actual data */}
+      {hasNegativeValues && (
+        <div className="mt-2 text-[10px] text-rose-500 italic">
+          * Terdapat bulan dengan profit negatif - {trendData.labels[lowestProfitIndex]} ({formatIDR(minProfit)})
+        </div>
+      )}
+      {!hasNegativeValues && lowestProfitIndex >= 0 && minProfit > 0 && (
+        <div className="mt-2 text-[10px] text-slate-400 italic">
+          * Profit terendah: {trendData.labels[lowestProfitIndex]} ({formatIDR(minProfit)})
+        </div>
+      )}
     </div>
   );
 }
 
 // ==========================================
+// ==========================================
 // JABODETABEK MAP COMPONENT - FR-014
-// Peta interaktif dengan tooltips AI recommendation
+// Peta interaktif dengan AI recommendation tooltip
 // ==========================================
 function JabodetabekMap({ branches, onBranchClick }: {
   branches: Array<{
@@ -309,20 +404,23 @@ function JabodetabekMap({ branches, onBranchClick }: {
     red: { bg: 'bg-rose-500', ring: 'ring-rose-200', text: 'text-rose-600' },
   };
 
-  // FR-014: Generate AI Recommendation based on stock levels
+  const BRANCH_COORDS: Record<string, { x: number; y: number }> = {
+    'CBG-001': { x: 45, y: 65 },
+    'CBG-002': { x: 55, y: 35 },
+    'CBG-003': { x: 75, y: 45 },
+    'CBG-004': { x: 25, y: 30 },
+    'CBG-005': { x: 50, y: 85 },
+  };
+
   const generateAIRecommendation = (stocks: Array<{ item: string; stok_saat_ini: number; safety_threshold: number }>) => {
     const recommendations: string[] = [];
-
     for (const stock of stocks) {
       if (stock.stok_saat_ini < stock.safety_threshold) {
-        const needed = stock.safety_threshold - stock.stok_saat_ini + 20; // buffer
-        recommendations.push(`Direkomendasikan melakukan restock ${stock.item} sebanyak ${needed} PCS`);
+        const needed = stock.safety_threshold - stock.stok_saat_ini + 20;
+        recommendations.push('Direkomendasikan restock ' + stock.item + ' ' + needed + ' PCS');
       }
     }
-
-    return recommendations.length > 0
-      ? recommendations.join('. ') + '.'
-      : 'Semua stok dalam kondisi aman.';
+    return recommendations.length > 0 ? recommendations.join('. ') + '.' : 'Semua stok aman.';
   };
 
   return (
@@ -330,22 +428,14 @@ function JabodetabekMap({ branches, onBranchClick }: {
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-bold text-navy">Peta Sebaran Jabodetabek</h3>
         <div className="flex gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Aman
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Peringatan
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Kritis
-          </span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Aman</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Peringatan</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Kritis</span>
         </div>
       </div>
 
-      {/* Map Container */}
-      <div className="relative bg-slate-50 rounded-xl h-72 overflow-hidden">
-        {/* Grid pattern background */}
-        <div className="absolute inset-0 opacity-30">
+      <div className="relative bg-slate-50 rounded-xl h-[500px]">
+        <div className="absolute inset-0 opacity-30 overflow-hidden rounded-xl">
           <svg width="100%" height="100%">
             <defs>
               <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -356,7 +446,6 @@ function JabodetabekMap({ branches, onBranchClick }: {
           </svg>
         </div>
 
-        {/* Branch markers */}
         {branches.map((branch) => {
           const colors = colorMap[branch.pin_color];
           const isHovered = hoveredBranch === branch.id_cabang;
@@ -365,60 +454,54 @@ function JabodetabekMap({ branches, onBranchClick }: {
           return (
             <div
               key={branch.id_cabang}
-              className="absolute group cursor-pointer"
-              style={{ left: `${20 + Math.random() * 60}%`, top: `${20 + Math.random() * 60}%` }}
+              className="absolute group cursor-pointer z-10"
+              style={{ left: (BRANCH_COORDS[branch.id_cabang]?.x ?? 50) + '%', top: (BRANCH_COORDS[branch.id_cabang]?.y ?? 50) + '%', transform: 'translate(-50%, -50%)' }}
               onMouseEnter={() => setHoveredBranch(branch.id_cabang)}
               onMouseLeave={() => setHoveredBranch(null)}
               onClick={() => onBranchClick(branch.id_cabang)}
             >
-              {/* Marker dot */}
-              <div
-                className={`w-8 h-8 rounded-full ${colors.bg} ring-4 ${colors.ring} flex items-center justify-center text-white font-bold text-xs shadow-lg transition-transform hover:scale-125 z-10`}
-              >
+              <div className={'w-10 h-10 rounded-full ' + colors.bg + ' ring-4 ' + colors.ring + ' flex items-center justify-center text-white font-bold text-sm shadow-lg'}>
                 {branch.id_cabang.replace('CBG-', '')}
               </div>
 
-              {/* Pulse effect for critical */}
               {branch.pin_color === 'red' && (
-                <div className={`absolute inset-0 w-8 h-8 rounded-full ${colors.bg} animate-ping opacity-50`}></div>
+                <div className={'absolute inset-0 w-10 h-10 rounded-full ' + colors.bg + ' animate-ping opacity-50'}></div>
               )}
 
-              {/* AI Recommendation Tooltip - FR-014 */}
-              {isHovered && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-white border border-slate-200 rounded-xl shadow-elevated p-4 z-20 pointer-events-none">
-                  <div className="border-b border-slate-100 pb-2 mb-2">
-                    <p className="font-bold text-navy">{branch.nama_cabang}</p>
-                    <p className="text-xs text-slate-400">{branch.id_cabang}</p>
-                  </div>
-                  <div className="space-y-1 mb-3">
-                    {branch.stocks.map((stock) => (
-                      <div key={stock.item} className="flex justify-between text-xs">
-                        <span className="text-slate-600">{stock.item}</span>
-                        <span className={`font-medium ${stock.stok_saat_ini < stock.safety_threshold ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {stock.stok_saat_ini} / min {stock.safety_threshold}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
-                    <p className="text-[11px] font-semibold text-amber-800 mb-1">🤖 AI Recommendation</p>
-                    <p className="text-[10px] text-amber-700 leading-relaxed">{recommendation}</p>
-                  </div>
+              <div className={'absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-30 transition-all duration-200 ' + (isHovered ? 'opacity-100 visible' : 'opacity-0 invisible')}>
+                <div className="border-b border-slate-100 pb-2 mb-2">
+                  <p className="font-bold text-navy">{branch.nama_cabang}</p>
+                  <p className="text-xs text-slate-400">{branch.id_cabang}</p>
                 </div>
-              )}
+                <div className="space-y-1 mb-3">
+                  {branch.stocks.map((stock) => (
+                    <div key={stock.item} className="flex justify-between text-xs">
+                      <span className="text-slate-600">{stock.item}</span>
+                      <span className={'font-medium ' + (stock.stok_saat_ini < stock.safety_threshold ? 'text-rose-600' : 'text-emerald-600')}>
+                        {stock.stok_saat_ini} / min {stock.safety_threshold}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  <p className="text-xs font-semibold text-amber-800 mb-1">AI Recommendation</p>
+                  <p className="text-xs text-amber-700 leading-relaxed">{recommendation}</p>
+                </div>
+              </div>
             </div>
           );
         })}
 
-        {/* Map label */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05]">
           <span className="text-4xl font-black tracking-[0.3em] text-slate-900">JABODETABEK</span>
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-400 text-center">Klik atau arahkan kursor ke penanda untuk melihat detail & AI recommendation</p>
+
+      <p className="mt-3 text-xs text-slate-400 text-center">Hover pada penanda untuk melihat AI recommendation</p>
     </div>
   );
 }
+
 
 // ==========================================
 // MAIN DASHBOARD EKSEKUTIF COMPONENT
@@ -543,17 +626,74 @@ export interface AnomalyLog {
 // MOCK MONTHLY DATA FOR CHARTS - FR-011
 // NOTE: This is fallback data. Real data is derived from API per branch
 // For demo purposes aligned with PRD v2.0 context (May stockout scenario)
+// Branch-specific mock patterns to show different trends per branch filter
 // ==========================================
-const MOCK_MONTHLY_CASHFLOW = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
-  income: [18500000, 21200000, 19800000, 22400000, 20500000, 22800000],
-  expense: [12000000, 14500000, 13800000, 15200000, 14800000, 16200000],
+
+// Branch-specific cash flow patterns (different peaks/off-peaks)
+const MOCK_CASHFLOW_PATTERNS: Record<string, { labels: string[]; income: number[]; expense: number[] }> = {
+  'all': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [18500000, 21200000, 19800000, 22400000, 20500000, 22800000],
+    expense: [12000000, 14500000, 13800000, 15200000, 14800000, 16200000],
+  },
+  'CBG-001': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [4500000, 5200000, 4800000, 5500000, 2800000, 5200000],
+    expense: [2800000, 3400000, 3200000, 3600000, 3100000, 3800000],
+  },
+  'CBG-002': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [3800000, 4500000, 4200000, 5000000, 1500000, 3500000],
+    expense: [2400000, 2900000, 2700000, 3200000, 2800000, 3000000],
+  },
+  'CBG-003': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [3200000, 3600000, 3400000, 4200000, 2200000, 3800000],
+    expense: [2000000, 2400000, 2200000, 2700000, 2300000, 2600000],
+  },
+  'CBG-004': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [4000000, 4500000, 4200000, 5200000, 3500000, 4500000],
+    expense: [2600000, 3000000, 2800000, 3400000, 2900000, 3100000],
+  },
+  'CBG-005': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    income: [3000000, 3500000, 3200000, 3500000, 800000, 2800000],
+    expense: [2200000, 2600000, 2400000, 2500000, 2200000, 2500000],
+  },
 };
 
-const MOCK_PROFIT_TREND = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
-  profit: [6500000, 6700000, 6000000, 7200000, 5700000, 6600000],
+// Branch-specific profit trend patterns (different growth/decline patterns)
+const MOCK_PROFIT_TREND_PATTERNS: Record<string, { labels: string[]; profit: number[] }> = {
+  'all': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [6500000, 6700000, 6000000, 7200000, 5700000, 6600000],
+  },
+  'CBG-001': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [1700000, 1800000, 1600000, 1900000, 500000, 1400000],
+  },
+  'CBG-002': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [1400000, 1600000, 1500000, 1800000, -1300000, 500000],
+  },
+  'CBG-003': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [1200000, 1200000, 1200000, 1500000, -100000, 1200000],
+  },
+  'CBG-004': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [1400000, 1500000, 1400000, 1800000, 600000, 1400000],
+  },
+  'CBG-005': {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+    profit: [800000, 900000, 800000, 1000000, -1400000, 300000],
+  },
 };
+
+// Default fallback patterns
+const MOCK_MONTHLY_CASHFLOW: { labels: string[]; income: number[]; expense: number[] } = MOCK_CASHFLOW_PATTERNS['all']!;
+const MOCK_PROFIT_TREND: { labels: string[]; profit: number[] } = MOCK_PROFIT_TREND_PATTERNS['all']!;
 
 // ==========================================
 // UTILITY: Derive monthly data from API branch data
@@ -568,24 +708,36 @@ function deriveMonthlyDataFromBranches(
     ? perCabang
     : perCabang.filter(b => b.id_cabang === selectedBranchId);
 
-  const monthlyDistribution = [0.18, 0.21, 0.19, 0.22, 0.20, 0.22];
-
-  const avgExpenseRatio = branches.reduce((sum, b) => {
-    const ratio = b.omzet > 0 ? b.total_pengeluaran / b.omzet : 0;
-    return sum + ratio;
-  }, 0) / Math.max(branches.length, 1);
+  // Branch-specific monthly distribution patterns (realistic seasonal variation)
+  // Different branches have different peak/off-peak months
+  const BRANCH_MONTHLY_PATTERNS: Record<string, number[]> = {
+    'CBG-001': [0.16, 0.18, 0.17, 0.19, 0.12, 0.18], // Pusat - strong May dip
+    'CBG-002': [0.17, 0.20, 0.18, 0.21, 0.10, 0.14], // Jakarta Selatan
+    'CBG-003': [0.18, 0.19, 0.17, 0.20, 0.11, 0.15], // Bekasi Timur
+    'CBG-004': [0.15, 0.17, 0.18, 0.22, 0.13, 0.15], // Tangerang
+    'CBG-005': [0.19, 0.21, 0.19, 0.18, 0.08, 0.15], // Bogor - worst May
+    'all': [0.18, 0.21, 0.19, 0.22, 0.20, 0.22], // Combined - normalized
+  };
+  const DEFAULT_PATTERN = [0.18, 0.21, 0.19, 0.22, 0.20, 0.22];
+  const monthlyDistribution = BRANCH_MONTHLY_PATTERNS[selectedBranchId] || DEFAULT_PATTERN;
 
   const totalEffectiveIncome = branches.reduce((sum, b) => sum + b.total_pemasukan, 0);
+  const totalExpense = branches.reduce((sum, b) => sum + b.total_pengeluaran, 0);
 
+  // Distribute income and expense based on monthly patterns
   const income = months.map((_month, i) => Math.round(totalEffectiveIncome * (monthlyDistribution[i] ?? 0)));
-  const expense = income.map(inc => Math.round(inc * avgExpenseRatio));
+  const expense = months.map((_month, i) => Math.round(totalExpense * (monthlyDistribution[i] ?? 0)));
 
-  const hasValidData = totalEffectiveIncome > 0;
+  // Check if we have valid real data
+  const hasValidData = totalEffectiveIncome > 0 || totalExpense > 0;
+
+  // Use branch-specific mock pattern when no real data
+  const fallbackData = MOCK_CASHFLOW_PATTERNS[selectedBranchId] ?? MOCK_MONTHLY_CASHFLOW;
 
   return {
     labels: months,
-    income: hasValidData ? income : MOCK_MONTHLY_CASHFLOW.income,
-    expense: hasValidData ? expense : MOCK_MONTHLY_CASHFLOW.expense,
+    income: hasValidData ? income : fallbackData!.income,
+    expense: hasValidData ? expense : fallbackData!.expense,
   };
 }
 
@@ -598,26 +750,51 @@ function deriveProfitTrendFromBranches(
     ? perCabang
     : perCabang.filter(b => b.id_cabang === selectedBranchId);
 
-  const monthlyDistribution = [0.18, 0.21, 0.19, 0.22, 0.20, 0.22];
+  // Branch-specific monthly distribution patterns (must sum to ~1.0)
+  // These patterns reflect different seasonal/business patterns per branch
+  const BRANCH_PROFIT_PATTERNS: Record<string, number[]> = {
+    'CBG-001': [0.17, 0.20, 0.18, 0.21, 0.06, 0.18], // Pusat - strong May dip due to stockout
+    'CBG-002': [0.16, 0.22, 0.19, 0.24, 0.03, 0.16], // Jakarta Selatan - worst affected
+    'CBG-003': [0.18, 0.19, 0.17, 0.23, 0.05, 0.18], // Bekasi Timur - moderate dip
+    'CBG-004': [0.15, 0.18, 0.20, 0.25, 0.08, 0.14], // Tangerang - least affected
+    'CBG-005': [0.20, 0.23, 0.21, 0.22, 0.02, 0.12],  // Bogor - most severe May dip
+    'all': [0.18, 0.21, 0.19, 0.22, 0.08, 0.12],      // Combined average
+  };
+  const DEFAULT_PROFIT_PATTERN = [0.18, 0.21, 0.19, 0.22, 0.08, 0.12];
+  const monthlyDistribution = BRANCH_PROFIT_PATTERNS[selectedBranchId] || DEFAULT_PROFIT_PATTERN;
 
+  // Get actual totals from branches
   const totalEffectiveIncome = branches.reduce((sum, b) => sum + b.total_pemasukan, 0);
   const totalExpense = branches.reduce((sum, b) => sum + b.total_pengeluaran, 0);
 
-  const mayAdjustment = 0.85;
+  // Calculate may adjustment for lowest profit month
+  const mayAdjustment = 0.5; // Strong May dip due to stockout (PRD context)
+
+  // Find which month typically has lowest profit for this branch
+  const lowestMonthIndex = monthlyDistribution.indexOf(Math.min(...monthlyDistribution));
 
   const profit = months.map((_month, i) => {
     const dist = monthlyDistribution[i] ?? 0;
     const monthIncome = totalEffectiveIncome * dist;
     const monthExpense = totalExpense * dist;
-    const baseProfit = monthIncome - monthExpense;
-    return i === 4 ? Math.round(baseProfit * mayAdjustment) : Math.round(baseProfit);
+    let baseMonthProfit = monthIncome - monthExpense;
+
+    // Apply May dip adjustment if this is the lowest month
+    if (i === lowestMonthIndex && baseMonthProfit > 0) {
+      return Math.round(baseMonthProfit * mayAdjustment);
+    }
+    return Math.round(baseMonthProfit);
   });
 
-  const hasValidData = totalEffectiveIncome > 0;
+  // Check if we have valid real data
+  const hasValidData = totalEffectiveIncome > 0 || totalExpense > 0;
+
+  // Use branch-specific mock pattern when no real data
+  const fallbackData = MOCK_PROFIT_TREND_PATTERNS[selectedBranchId] ?? MOCK_PROFIT_TREND;
 
   return {
     labels: months,
-    profit: hasValidData ? profit : MOCK_PROFIT_TREND.profit,
+    profit: hasValidData ? profit : fallbackData!.profit,
   };
 }
 
@@ -636,6 +813,7 @@ export function DashboardEksekutif({ userRole, selectedAdminBranch, triggerNotif
   // PRD v2.0: Batas Anggaran Operasional
   const BUDGET_THRESHOLD = 22500000; // Rp 22.500.000 per bulan
 
+  // Auto-refresh on mount and periodically
   useEffect(() => {
     let cancelled = false;
     async function fetchDashboard() {
@@ -653,7 +831,19 @@ export function DashboardEksekutif({ userRole, selectedAdminBranch, triggerNotif
     }
 
     fetchDashboard();
-    return () => { cancelled = true; };
+    
+    // Refresh every 30 seconds for real-time inventory updates
+    const interval = setInterval(fetchDashboard, 30000);
+    
+    // Also refresh when window regains focus
+    const handleFocus = () => fetchDashboard();
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const processedBranches = useMemo(() => {
@@ -706,13 +896,20 @@ export function DashboardEksekutif({ userRole, selectedAdminBranch, triggerNotif
 
   // FR-011: Derive chart data from API data (instead of using mock data)
   // This ensures chart reflects actual branch financials from the dashboard
-  const derivedCashFlowData = useMemo(() => {
-    if (!data) return MOCK_MONTHLY_CASHFLOW;
+  // Uses branch-specific patterns when no real data is available
+  const derivedCashFlowData = useMemo((): { labels: string[]; income: number[]; expense: number[] } => {
+    if (!data) {
+      const pattern = MOCK_CASHFLOW_PATTERNS[chartBranchFilter];
+      return pattern ?? MOCK_MONTHLY_CASHFLOW;
+    }
     return deriveMonthlyDataFromBranches(data.per_cabang, chartBranchFilter);
   }, [data, chartBranchFilter]);
 
-  const derivedProfitTrendData = useMemo(() => {
-    if (!data) return MOCK_PROFIT_TREND;
+  const derivedProfitTrendData = useMemo((): { labels: string[]; profit: number[] } => {
+    if (!data) {
+      const pattern = MOCK_PROFIT_TREND_PATTERNS[chartBranchFilter];
+      return pattern ?? MOCK_PROFIT_TREND;
+    }
     return deriveProfitTrendFromBranches(data.per_cabang, chartBranchFilter);
   }, [data, chartBranchFilter]);
 

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getActiveServices, calculateTotalHarga } from '../config/services.js';
+import { getActiveServicesFromDB, getActiveServices, calculateTotalHarga } from '../config/services.js';
 
 const router = Router();
 
@@ -9,8 +9,8 @@ const router = Router();
 // ==========================================
 
 interface ServiceTariffResponse {
-  success: true;
-  services: Array<{
+  success: boolean;
+  services?: Array<{
     id_layanan: string;
     nama_layanan: string;
     kategori: string;
@@ -18,22 +18,28 @@ interface ServiceTariffResponse {
     harga_per_satuan: number;
     estimasi_hari: number;
   }>;
+  error?: string;
 }
 
 // GET all active service tariffs
-router.get('/tariffs', (_req: Request, res: Response<ServiceTariffResponse>) => {
-  const services = getActiveServices();
-  res.status(200).json({
-    success: true,
-    services: services.map((s) => ({
-      id_layanan: s.id_layanan,
-      nama_layanan: s.nama_layanan,
-      kategori: s.kategori,
-      satuan: s.satuan,
-      harga_per_satuan: s.harga_per_satuan,
-      estimasi_hari: s.estimasi_hari,
-    })),
-  });
+router.get('/tariffs', async (_req: Request, res: Response<ServiceTariffResponse>) => {
+  try {
+    const services = await getActiveServicesFromDB();
+    res.status(200).json({
+      success: true,
+      services: services.map((s) => ({
+        id_layanan: s.id_layanan,
+        nama_layanan: s.nama_layanan,
+        kategori: s.kategori,
+        satuan: s.satuan,
+        harga_per_satuan: s.harga_per_satuan,
+        estimasi_hari: s.estimasi_hari,
+      })),
+    });
+  } catch (error) {
+    console.error('[Services] GET /tariffs error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 // Calculate total price
@@ -42,7 +48,8 @@ interface CalculateBody {
   qty: number;
 }
 
-type CalculateResponse = | { success: true; id_layanan: string; qty: number; harga_per_satuan: number; total_harga: number; formatted: string }
+type CalculateResponse =
+  | { success: true; id_layanan: string; qty: number; harga_per_satuan: number; total_harga: number; formatted: string }
   | { success: false; error: string };
 
 router.post('/calculate', (req: Request<Record<string, never>, CalculateResponse, CalculateBody>, res: Response<CalculateResponse>) => {

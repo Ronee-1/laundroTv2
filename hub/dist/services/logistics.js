@@ -11,75 +11,250 @@ exports.handoverShipment = handoverShipment;
 exports.getAllLogistics = getAllLogistics;
 exports.getLogisticsById = getLogisticsById;
 exports.getReplenishmentRecommendation = getReplenishmentRecommendation;
+const prisma_js_1 = require("../lib/prisma.js");
 const inventory_js_1 = require("./inventory.js");
-const LOGISTICS = [];
-let nextId = 1;
-function generateId() {
-    return `LOG-${String(nextId++).padStart(4, '0')}`;
-}
-function createShipment(branchId, sentItems) {
-    const log = {
-        id: generateId(),
-        branchId,
-        sentItems,
+// ==========================================
+// LOGISTICS CRUD OPERATIONS
+// ==========================================
+/**
+ * Create new shipment log
+ */
+async function createShipment(branchId, sentItems) {
+    const id = `LOG-${Date.now().toString(36).toUpperCase()}`;
+    const log = await prisma_js_1.prisma.logisticsLog.create({
+        data: {
+            id_cabang: branchId,
+            sent_items: sentItems,
+            status: 'In-Transit',
+        },
+    });
+    return {
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
         receivedItems: null,
         discrepancy: null,
-        status: 'In-Transit',
-        timestamp: new Date(),
+        status: log.status,
+        timestamp: log.timestamp,
     };
-    LOGISTICS.push(log);
-    return log;
 }
-function verifyShipment(logId, receivedItems) {
-    const log = LOGISTICS.find((l) => l.id === logId);
-    if (!log || (log.status !== 'Awaiting-Verification' && log.status !== 'In-Transit'))
+/**
+ * Verify shipment received
+ */
+async function verifyShipment(logId, receivedItems) {
+    try {
+        const log = await prisma_js_1.prisma.logisticsLog.findUnique({
+            where: { id: logId },
+        });
+        if (!log || (log.status !== 'Awaiting-Verification' && log.status !== 'In-Transit')) {
+            return null;
+        }
+        const discrepancy = {
+            detergen: receivedItems.detergen - log.sent_items.detergen,
+            pelembut: receivedItems.pelembut - log.sent_items.pelembut,
+            plastik: receivedItems.plastik - log.sent_items.plastik,
+        };
+        const hasDiscrepancy = discrepancy.detergen !== 0 || discrepancy.pelembut !== 0 || discrepancy.plastik !== 0;
+        const updated = await prisma_js_1.prisma.logisticsLog.update({
+            where: { id: logId },
+            data: {
+                received_items: receivedItems,
+                discrepancy: hasDiscrepancy ? discrepancy : undefined,
+                status: hasDiscrepancy ? 'Completed-Discrepancy' : 'Completed',
+            },
+        });
+        return {
+            id: updated.id,
+            branchId: updated.id_cabang,
+            sentItems: updated.sent_items,
+            receivedItems: updated.received_items,
+            discrepancy: updated.discrepancy,
+            status: updated.status,
+            timestamp: updated.timestamp,
+        };
+    }
+    catch {
         return null;
-    log.receivedItems = receivedItems;
-    const discrepancy = {
-        detergen: receivedItems.detergen - log.sentItems.detergen,
-        pelembut: receivedItems.pelembut - log.sentItems.pelembut,
-        plastik: receivedItems.plastik - log.sentItems.plastik,
+    }
+}
+/**
+ * Get logistics by branch
+ */
+async function getLogisticsByBranch(branchId) {
+    const logs = await prisma_js_1.prisma.logisticsLog.findMany({
+        where: { id_cabang: branchId },
+        orderBy: { timestamp: 'desc' },
+    });
+    return logs.map((log) => ({
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
+    }));
+}
+/**
+ * Get in-transit shipments for a branch
+ */
+async function getInTransitByBranch(branchId) {
+    const logs = await prisma_js_1.prisma.logisticsLog.findMany({
+        where: { id_cabang: branchId, status: 'In-Transit' },
+        orderBy: { timestamp: 'desc' },
+    });
+    return logs.map((log) => ({
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
+    }));
+}
+/**
+ * Get all active shipments
+ */
+async function getActiveShipments() {
+    const logs = await prisma_js_1.prisma.logisticsLog.findMany({
+        where: {
+            status: {
+                in: ['In-Transit', 'Driver-En-Route', 'Awaiting-Verification'],
+            },
+        },
+        orderBy: { timestamp: 'desc' },
+    });
+    return logs.map((log) => ({
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
+    }));
+}
+/**
+ * Get active shipments for a specific branch
+ */
+async function getActiveShipmentsByBranch(branchId) {
+    const logs = await prisma_js_1.prisma.logisticsLog.findMany({
+        where: {
+            id_cabang: branchId,
+            status: {
+                in: ['In-Transit', 'Driver-En-Route', 'Awaiting-Verification'],
+            },
+        },
+        orderBy: { timestamp: 'desc' },
+    });
+    return logs.map((log) => ({
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
+    }));
+}
+/**
+ * Start route (driver en route)
+ */
+async function startRoute(logId) {
+    try {
+        const log = await prisma_js_1.prisma.logisticsLog.findUnique({
+            where: { id: logId },
+        });
+        if (!log || log.status !== 'In-Transit')
+            return null;
+        const updated = await prisma_js_1.prisma.logisticsLog.update({
+            where: { id: logId },
+            data: { status: 'Driver-En-Route' },
+        });
+        return {
+            id: updated.id,
+            branchId: updated.id_cabang,
+            sentItems: updated.sent_items,
+            receivedItems: null,
+            discrepancy: null,
+            status: updated.status,
+            timestamp: updated.timestamp,
+        };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Handover shipment (awaiting verification)
+ */
+async function handoverShipment(logId) {
+    try {
+        const log = await prisma_js_1.prisma.logisticsLog.findUnique({
+            where: { id: logId },
+        });
+        if (!log || log.status !== 'Driver-En-Route')
+            return null;
+        const updated = await prisma_js_1.prisma.logisticsLog.update({
+            where: { id: logId },
+            data: { status: 'Awaiting-Verification' },
+        });
+        return {
+            id: updated.id,
+            branchId: updated.id_cabang,
+            sentItems: updated.sent_items,
+            receivedItems: null,
+            discrepancy: null,
+            status: updated.status,
+            timestamp: updated.timestamp,
+        };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Get all logistics
+ */
+async function getAllLogistics() {
+    const logs = await prisma_js_1.prisma.logisticsLog.findMany({
+        orderBy: { timestamp: 'desc' },
+    });
+    return logs.map((log) => ({
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
+    }));
+}
+/**
+ * Get logistics by ID
+ */
+async function getLogisticsById(logId) {
+    const log = await prisma_js_1.prisma.logisticsLog.findUnique({
+        where: { id: logId },
+    });
+    if (!log)
+        return null;
+    return {
+        id: log.id,
+        branchId: log.id_cabang,
+        sentItems: log.sent_items,
+        receivedItems: log.received_items,
+        discrepancy: log.discrepancy,
+        status: log.status,
+        timestamp: log.timestamp,
     };
-    const hasDiscrepancy = discrepancy.detergen !== 0 || discrepancy.pelembut !== 0 || discrepancy.plastik !== 0;
-    log.discrepancy = hasDiscrepancy ? discrepancy : null;
-    log.status = hasDiscrepancy ? 'Completed-Discrepancy' : 'Completed';
-    return log;
 }
-function getLogisticsByBranch(branchId) {
-    return LOGISTICS.filter((l) => l.branchId === branchId);
-}
-function getInTransitByBranch(branchId) {
-    return LOGISTICS.filter((l) => l.branchId === branchId && l.status === 'In-Transit');
-}
-function getActiveShipments() {
-    return LOGISTICS.filter((l) => l.status === 'In-Transit' || l.status === 'Driver-En-Route' || l.status === 'Awaiting-Verification');
-}
-function getActiveShipmentsByBranch(branchId) {
-    return LOGISTICS.filter((l) => l.branchId === branchId &&
-        (l.status === 'In-Transit' || l.status === 'Driver-En-Route' || l.status === 'Awaiting-Verification'));
-}
-function startRoute(logId) {
-    const log = LOGISTICS.find((l) => l.id === logId);
-    if (!log || log.status !== 'In-Transit')
-        return null;
-    log.status = 'Driver-En-Route';
-    return log;
-}
-function handoverShipment(logId) {
-    const log = LOGISTICS.find((l) => l.id === logId);
-    if (!log || log.status !== 'Driver-En-Route')
-        return null;
-    log.status = 'Awaiting-Verification';
-    return log;
-}
-function getAllLogistics() {
-    return [...LOGISTICS];
-}
-function getLogisticsById(logId) {
-    return LOGISTICS.find((l) => l.id === logId);
-}
-function getReplenishmentRecommendation(branchId) {
-    const inventory = (0, inventory_js_1.getInventoryByBranch)(branchId);
+/**
+ * Get replenishment recommendation for a branch
+ */
+async function getReplenishmentRecommendation(branchId) {
+    const inventory = await (0, inventory_js_1.getInventoryByBranch)(branchId);
     if (!inventory) {
         return { branchId, items: [], needs_replenishment: false };
     }

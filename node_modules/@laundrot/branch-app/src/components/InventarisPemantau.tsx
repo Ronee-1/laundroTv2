@@ -110,6 +110,7 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
     } catch { /* ignore */ }
   }
 
+  // Auto-refresh on mount and periodically
   useEffect(() => {
     let cancelled = false;
     async function fetchInventory() {
@@ -122,11 +123,20 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
       } catch { if (!cancelled) setError('Tidak dapat terhubung.'); } finally { if (!cancelled) setLoading(false); }
     }
     fetchInventory();
-    return () => { cancelled = true; };
+    // Refresh every 30 seconds for real-time inventory updates
+    const interval = setInterval(fetchInventory, 30000);
+    // Also refresh when window regains focus
+    const handleFocus = () => fetchInventory();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {
-    const branchId = userRole === 'Admin Cabang' ? selectedAdminBranch : null;
+    const branchId = userRole === 'Admin' ? selectedAdminBranch : null;
     if (branchId) fetchLogistics(branchId);
     else setInTransitLogs([]);
   }, [userRole, selectedAdminBranch]);
@@ -157,7 +167,7 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
         triggerNotification(json.message, json.logistics.status === 'Completed' ? 'success' : 'warning');
         setShowVerifyForm(false);
         setVerifyLogId(null);
-        const branchId = userRole === 'Admin Cabang' ? selectedAdminBranch : null;
+        const branchId = userRole === 'Admin' ? selectedAdminBranch : null;
         if (branchId) fetchLogistics(branchId);
         const dashRes = await fetch('/api/owner/dashboard');
         const dashJson = (await dashRes.json()) as DashboardData;
@@ -203,7 +213,7 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
   );
 
   const showNoUpdateWarning = (() => {
-    if (userRole !== 'Admin Cabang') return false;
+    if (userRole !== 'Admin') return false;
     const branch = data.per_cabang.find((b) => b.id_cabang === selectedAdminBranch);
     if (!branch || !branch.inventory.last_updated) return false;
     const lastUpdateDate = new Date(branch.inventory.last_updated);
@@ -220,13 +230,13 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
           <p className="text-sm text-slate-500 mt-1">Deteksi dini stok logistik bahan baku</p>
         </div>
         <div className="flex items-center gap-3">
-          {userRole === 'Admin Cabang' && (
+          {userRole === 'Admin' && (
             <button onClick={() => setShowAdjustModal(true)}
               className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-2xl text-sm font-medium hover:bg-red-100 transition-all">
               ⚠️ Penyesuaian Stok
             </button>
           )}
-          {userRole === 'Admin Cabang' && (
+          {userRole === 'Admin' && (
             <button onClick={() => setShowRestockRequestModal(true)}
               className="bg-deep-blue text-white px-4 py-2 rounded-2xl text-sm font-medium hover:bg-navy transition-all">
               + Ajukan Restok
@@ -480,7 +490,7 @@ export function InventarisPemantau({ userRole, selectedAdminBranch, triggerNotif
             <div className="p-5 border-b border-slate-200 flex justify-between items-start">
               <div>
                 <h3 className="text-base font-bold text-navy">📋 Konfirmasi Pengajuan Restok</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Setujui atau tolak pengajuan dari Admin Cabang</p>
+                <p className="text-xs text-slate-500 mt-0.5">Setujui atau tolak pengajuan dari Admin</p>
               </div>
               <button onClick={() => setShowApprovalPanel(false)} className="text-slate-400 hover:text-navy">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

@@ -44,7 +44,7 @@ export function JabodetabekMap({ branches }: JabodetabekMapProps) {
         </div>
       </div>
 
-      <div className="relative bg-slate-50/80 border border-slate-200/60 rounded-[20px] h-80 overflow-hidden">
+      <div className="relative bg-slate-50/80 border border-slate-200/60 rounded-[20px] h-[500px] overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-50"></div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
           <span className="text-slate-900 font-black text-4xl tracking-[0.3em] uppercase">JABODETABEK</span>
@@ -61,10 +61,10 @@ export function JabodetabekMap({ branches }: JabodetabekMapProps) {
 
           return (
             <div key={branch.id_cabang} className="absolute -translate-x-1/2 -translate-y-1/2 group z-10" style={{ left: `${coord.x}%`, top: `${coord.y}%` }}>
-              <div className={`w-6 h-6 rounded-full ${c.bg} ring-4 ${c.ring} flex items-center justify-center text-white font-bold text-[9px] shadow-lg cursor-pointer hover:scale-125 transition-transform duration-300`}>
+              <div className={`w-8 h-8 rounded-full ${c.bg} ring-4 ${c.ring} flex items-center justify-center text-white font-bold text-xs shadow-lg cursor-pointer`}>
                 {branch.id_cabang.replace('CBG-00', '')}
               </div>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-44 bg-white border border-slate-200 p-3 rounded-xl shadow-elevated opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 pointer-events-none z-20">
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-44 bg-white border border-slate-200 p-3 rounded-xl shadow-elevated opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 pointer-events-none z-20 max-h-32 overflow-y-auto">
                 <p className="text-[11px] font-bold text-[#0F172A]">{branch.nama_cabang}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">{branch.id_cabang}</p>
               </div>

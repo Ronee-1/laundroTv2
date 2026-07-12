@@ -1,14 +1,4 @@
-import type { LogisticsLog, StockCapacity } from '@laundrot/shared-types';
-export declare function createShipment(branchId: string, sentItems: StockCapacity): LogisticsLog;
-export declare function verifyShipment(logId: string, receivedItems: StockCapacity): LogisticsLog | null;
-export declare function getLogisticsByBranch(branchId: string): LogisticsLog[];
-export declare function getInTransitByBranch(branchId: string): LogisticsLog[];
-export declare function getActiveShipments(): LogisticsLog[];
-export declare function getActiveShipmentsByBranch(branchId: string): LogisticsLog[];
-export declare function startRoute(logId: string): LogisticsLog | null;
-export declare function handoverShipment(logId: string): LogisticsLog | null;
-export declare function getAllLogistics(): LogisticsLog[];
-export declare function getLogisticsById(logId: string): LogisticsLog | undefined;
+import type { StockCapacity } from '@laundrot/shared-types';
 export interface ReplenishmentItem {
     item: string;
     satuan: string;
@@ -23,5 +13,58 @@ export interface ReplenishmentRecommendation {
     items: ReplenishmentItem[];
     needs_replenishment: boolean;
 }
-export declare function getReplenishmentRecommendation(branchId: string): ReplenishmentRecommendation;
+interface LogisticsLogResponse {
+    id: string;
+    branchId: string;
+    sentItems: StockCapacity;
+    receivedItems: StockCapacity | null;
+    discrepancy: StockCapacity | null;
+    status: string;
+    timestamp: Date;
+}
+/**
+ * Create new shipment log
+ */
+export declare function createShipment(branchId: string, sentItems: StockCapacity): Promise<LogisticsLogResponse>;
+/**
+ * Verify shipment received
+ */
+export declare function verifyShipment(logId: string, receivedItems: StockCapacity): Promise<LogisticsLogResponse | null>;
+/**
+ * Get logistics by branch
+ */
+export declare function getLogisticsByBranch(branchId: string): Promise<LogisticsLogResponse[]>;
+/**
+ * Get in-transit shipments for a branch
+ */
+export declare function getInTransitByBranch(branchId: string): Promise<LogisticsLogResponse[]>;
+/**
+ * Get all active shipments
+ */
+export declare function getActiveShipments(): Promise<LogisticsLogResponse[]>;
+/**
+ * Get active shipments for a specific branch
+ */
+export declare function getActiveShipmentsByBranch(branchId: string): Promise<LogisticsLogResponse[]>;
+/**
+ * Start route (driver en route)
+ */
+export declare function startRoute(logId: string): Promise<LogisticsLogResponse | null>;
+/**
+ * Handover shipment (awaiting verification)
+ */
+export declare function handoverShipment(logId: string): Promise<LogisticsLogResponse | null>;
+/**
+ * Get all logistics
+ */
+export declare function getAllLogistics(): Promise<LogisticsLogResponse[]>;
+/**
+ * Get logistics by ID
+ */
+export declare function getLogisticsById(logId: string): Promise<LogisticsLogResponse | null>;
+/**
+ * Get replenishment recommendation for a branch
+ */
+export declare function getReplenishmentRecommendation(branchId: string): Promise<ReplenishmentRecommendation>;
+export {};
 //# sourceMappingURL=logistics.d.ts.map

@@ -13,51 +13,182 @@ exports.getAllRequests = getAllRequests;
 exports.getRequestById = getRequestById;
 exports.approveRequest = approveRequest;
 exports.rejectRequest = rejectRequest;
-const RESTOCK_REQUESTS = [];
-function createRestockRequest(params) {
-    const request = {
-        id_request: `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-        id_cabang: params.id_cabang,
-        nama_cabang: params.nama_cabang,
-        created_by: params.created_by,
-        requested_items: params.requested_items,
-        status: 'Pending',
-        catatan: params.catatan,
-        created_at: new Date(),
+const prisma_js_1 = require("../lib/prisma.js");
+// ==========================================
+// RESTOCK REQUEST CRUD OPERATIONS
+// ==========================================
+/**
+ * Create new restock request
+ */
+async function createRestockRequest(params) {
+    const id_request = `REQ-${Date.now().toString(36).toUpperCase()}`;
+    const request = await prisma_js_1.prisma.restockRequest.create({
+        data: {
+            id_request,
+            id_cabang: params.id_cabang,
+            nama_cabang: params.nama_cabang,
+            created_by: params.created_by,
+            requested_items: params.requested_items,
+            status: 'Pending',
+            catatan: params.catatan,
+        },
+    });
+    return {
+        id_request: request.id_request,
+        id_cabang: request.id_cabang,
+        nama_cabang: request.nama_cabang,
+        created_by: request.created_by,
+        requested_items: request.requested_items,
+        status: request.status,
+        catatan: request.catatan ?? undefined,
+        reviewed_by: request.reviewed_by ?? undefined,
+        reviewed_at: request.reviewed_at ?? undefined,
+        created_at: request.created_at,
     };
-    RESTOCK_REQUESTS.push(request);
-    return request;
 }
-function getPendingRequests() {
-    return RESTOCK_REQUESTS.filter((r) => r.status === 'Pending');
+/**
+ * Get all pending requests
+ */
+async function getPendingRequests() {
+    const requests = await prisma_js_1.prisma.restockRequest.findMany({
+        where: { status: 'Pending' },
+        orderBy: { created_at: 'desc' },
+    });
+    return requests.map((r) => ({
+        id_request: r.id_request,
+        id_cabang: r.id_cabang,
+        nama_cabang: r.nama_cabang,
+        created_by: r.created_by,
+        requested_items: r.requested_items,
+        status: r.status,
+        catatan: r.catatan ?? undefined,
+        reviewed_by: r.reviewed_by ?? undefined,
+        reviewed_at: r.reviewed_at ?? undefined,
+        created_at: r.created_at,
+    }));
 }
-function getRequestsByBranch(id_cabang) {
-    return RESTOCK_REQUESTS.filter((r) => r.id_cabang === id_cabang);
+/**
+ * Get requests by branch
+ */
+async function getRequestsByBranch(id_cabang) {
+    const requests = await prisma_js_1.prisma.restockRequest.findMany({
+        where: { id_cabang },
+        orderBy: { created_at: 'desc' },
+    });
+    return requests.map((r) => ({
+        id_request: r.id_request,
+        id_cabang: r.id_cabang,
+        nama_cabang: r.nama_cabang,
+        created_by: r.created_by,
+        requested_items: r.requested_items,
+        status: r.status,
+        catatan: r.catatan ?? undefined,
+        reviewed_by: r.reviewed_by ?? undefined,
+        reviewed_at: r.reviewed_at ?? undefined,
+        created_at: r.created_at,
+    }));
 }
-function getAllRequests() {
-    return [...RESTOCK_REQUESTS];
+/**
+ * Get all requests
+ */
+async function getAllRequests() {
+    const requests = await prisma_js_1.prisma.restockRequest.findMany({
+        orderBy: { created_at: 'desc' },
+    });
+    return requests.map((r) => ({
+        id_request: r.id_request,
+        id_cabang: r.id_cabang,
+        nama_cabang: r.nama_cabang,
+        created_by: r.created_by,
+        requested_items: r.requested_items,
+        status: r.status,
+        catatan: r.catatan ?? undefined,
+        reviewed_by: r.reviewed_by ?? undefined,
+        reviewed_at: r.reviewed_at ?? undefined,
+        created_at: r.created_at,
+    }));
 }
-function getRequestById(id_request) {
-    return RESTOCK_REQUESTS.find((r) => r.id_request === id_request);
-}
-function approveRequest(id_request, reviewed_by) {
-    const request = RESTOCK_REQUESTS.find((r) => r.id_request === id_request);
-    if (!request || request.status !== 'Pending')
+/**
+ * Get request by ID
+ */
+async function getRequestById(id_request) {
+    const request = await prisma_js_1.prisma.restockRequest.findUnique({
+        where: { id_request },
+    });
+    if (!request)
         return null;
-    request.status = 'Approved';
-    request.reviewed_by = reviewed_by;
-    request.reviewed_at = new Date();
-    return request;
+    return {
+        id_request: request.id_request,
+        id_cabang: request.id_cabang,
+        nama_cabang: request.nama_cabang,
+        created_by: request.created_by,
+        requested_items: request.requested_items,
+        status: request.status,
+        catatan: request.catatan ?? undefined,
+        reviewed_by: request.reviewed_by ?? undefined,
+        reviewed_at: request.reviewed_at ?? undefined,
+        created_at: request.created_at,
+    };
 }
-function rejectRequest(id_request, reviewed_by, catatan) {
-    const request = RESTOCK_REQUESTS.find((r) => r.id_request === id_request);
-    if (!request || request.status !== 'Pending')
+/**
+ * Approve restock request
+ */
+async function approveRequest(id_request, reviewed_by) {
+    try {
+        const request = await prisma_js_1.prisma.restockRequest.update({
+            where: { id_request },
+            data: {
+                status: 'Approved',
+                reviewed_by,
+                reviewed_at: new Date(),
+            },
+        });
+        return {
+            id_request: request.id_request,
+            id_cabang: request.id_cabang,
+            nama_cabang: request.nama_cabang,
+            created_by: request.created_by,
+            requested_items: request.requested_items,
+            status: request.status,
+            catatan: request.catatan ?? undefined,
+            reviewed_by: request.reviewed_by ?? undefined,
+            reviewed_at: request.reviewed_at ?? undefined,
+            created_at: request.created_at,
+        };
+    }
+    catch {
         return null;
-    request.status = 'Rejected';
-    request.reviewed_by = reviewed_by;
-    request.reviewed_at = new Date();
-    if (catatan)
-        request.catatan = catatan;
-    return request;
+    }
+}
+/**
+ * Reject restock request
+ */
+async function rejectRequest(id_request, reviewed_by, catatan) {
+    try {
+        const request = await prisma_js_1.prisma.restockRequest.update({
+            where: { id_request },
+            data: {
+                status: 'Rejected',
+                reviewed_by,
+                reviewed_at: new Date(),
+                catatan: catatan ?? undefined,
+            },
+        });
+        return {
+            id_request: request.id_request,
+            id_cabang: request.id_cabang,
+            nama_cabang: request.nama_cabang,
+            created_by: request.created_by,
+            requested_items: request.requested_items,
+            status: request.status,
+            catatan: request.catatan ?? undefined,
+            reviewed_by: request.reviewed_by ?? undefined,
+            reviewed_at: request.reviewed_at ?? undefined,
+            created_at: request.created_at,
+        };
+    }
+    catch {
+        return null;
+    }
 }
 //# sourceMappingURL=restockRequest.js.map
