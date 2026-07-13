@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     if (errors.length > 0) {
-      return errorResponse('Validation failed', 400, errors);
+      return errorResponse(`Validation failed: ${errors.join(', ')}`, 400);
     }
 
     // Check if email already exists
