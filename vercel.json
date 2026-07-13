@@ -1,11 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "cd spokes/branch-app && npm install --legacy-peer-deps && npm run build",
+  "buildCommand": "npm install --legacy-peer-deps && npm run build",
   "installCommand": "npm install --ignore-scripts",
   "framework": null,
   "regions": ["sin1"],
-  "outputDirectory": "spokes/branch-app/dist",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/:path*",
