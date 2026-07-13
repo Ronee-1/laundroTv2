@@ -8,69 +8,13 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-const BCRYPT_SALT_ROUNDS = 12;
+const BCRYPT_SALT = 12;
 
 async function main() {
   console.log('🌱 Starting database seed...\n');
 
   // ============================================================
-  // SEED USERS
-  // ============================================================
-  console.log('📋 Seeding Users...');
-
-  // Owner
-  const hashedOwner = await bcrypt.hash('haihh', BCRYPT_SALT_ROUNDS);
-  await prisma.user.upsert({
-    where: { email: 'budi@gmail.com' },
-    update: {},
-    create: {
-      id_user: 'OWN-001',
-      nama: 'Budi Santoso',
-      email: 'budi@gmail.com',
-      password: hashedOwner,
-      role: 'Owner',
-      id_cabang: null,
-      is_active: true,
-    },
-  });
-  console.log('✅ Owner: budi@gmail.com / haihh');
-
-  // Admin
-  const hashedAdmin = await bcrypt.hash('haihh', BCRYPT_SALT_ROUNDS);
-  await prisma.user.upsert({
-    where: { email: 'admin@laundrot.com' },
-    update: {},
-    create: {
-      id_user: 'ADM-001',
-      nama: 'Siti Aminah',
-      email: 'admin@laundrot.com',
-      password: hashedAdmin,
-      role: 'Admin',
-      id_cabang: 'CBG-002',
-      is_active: true,
-    },
-  });
-  console.log('✅ Admin: admin@laundrot.com / haihh');
-
-  // Kurir
-  const hashedKurir = await bcrypt.hash('haihh', BCRYPT_SALT_ROUNDS);
-  await prisma.user.upsert({
-    where: { email: 'kurir@laundrot.com' },
-    update: {},
-    create: {
-      id_user: 'KUR-003',
-      nama: 'Dedi Kurniawan',
-      email: 'kurir@laundrot.com',
-      password: hashedKurir,
-      role: 'Kurir',
-      id_cabang: 'CBG-002',
-      is_active: true,
-    },
-  });
-  console.log('✅ Kurir: kurir@laundrot.com / haihh\n');
-
-  // ============================================================
-  // SEED BRANCHES
+  // SEED BRANCHES FIRST (required for foreign keys)
   // ============================================================
   console.log('📍 Seeding Branches...');
 
@@ -92,7 +36,7 @@ async function main() {
   }
 
   // ============================================================
-  // SEED COURIERS
+  // SEED COURIERS FIRST (required for user Kurir)
   // ============================================================
   console.log('\n🚴 Seeding Couriers...');
 
@@ -112,6 +56,62 @@ async function main() {
     });
     console.log(`✅ Courier: ${courier.nama_kurir}`);
   }
+
+  // ============================================================
+  // SEED USERS (after branches exist)
+  // ============================================================
+  console.log('\n📋 Seeding Users...');
+
+  // Owner (no branch)
+  const hashedOwner = await bcrypt.hash('haihh', BCRYPT_SALT);
+  await prisma.user.upsert({
+    where: { email: 'budi@gmail.com' },
+    update: {},
+    create: {
+      id_user: 'OWN-001',
+      nama: 'Budi Santoso',
+      email: 'budi@gmail.com',
+      password: hashedOwner,
+      role: 'Owner',
+      id_cabang: null,
+      is_active: true,
+    },
+  });
+  console.log('✅ Owner: budi@gmail.com / haihh');
+
+  // Admin (CBG-002)
+  const hashedAdmin = await bcrypt.hash('haihh', BCRYPT_SALT);
+  await prisma.user.upsert({
+    where: { email: 'admin@laundrot.com' },
+    update: {},
+    create: {
+      id_user: 'ADM-001',
+      nama: 'Siti Aminah',
+      email: 'admin@laundrot.com',
+      password: hashedAdmin,
+      role: 'Admin',
+      id_cabang: 'CBG-002',
+      is_active: true,
+    },
+  });
+  console.log('✅ Admin: admin@laundrot.com / haihh');
+
+  // Kurir (CBG-002, KUR-003)
+  const hashedKurir = await bcrypt.hash('haihh', BCRYPT_SALT);
+  await prisma.user.upsert({
+    where: { email: 'kurir@laundrot.com' },
+    update: {},
+    create: {
+      id_user: 'KUR-003',
+      nama: 'Dedi Kurniawan',
+      email: 'kurir@laundrot.com',
+      password: hashedKurir,
+      role: 'Kurir',
+      id_cabang: 'CBG-002',
+      is_active: true,
+    },
+  });
+  console.log('✅ Kurir: kurir@laundrot.com / haihh');
 
   // ============================================================
   // SEED INVENTORY
