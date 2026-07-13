@@ -1,16 +1,14 @@
 /**
- * Single Order API
- * GET/PATCH /api/orders/[id]
+ * Order API - Consolidated
+ * GET /api/orders/:id
+ * PATCH /api/orders/:id (status update)
+ * POST /api/orders/:id/assign
  */
 
 import { prisma } from '../../../lib/prisma';
 import { requireAuth } from '../../utils/auth';
 import { getCorsHeaders } from '../../utils/cors';
 import { jsonResponse, errorResponse } from '../../utils/response';
-
-function buildGoogleMapsUrl(lat: number, lng: number): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-}
 
 export async function GET(
   request: Request,
@@ -32,38 +30,20 @@ export async function GET(
     const order = await prisma.order.findUnique({
       where: { id_order: id },
       include: {
-        branch: {
-          select: { id_cabang: true, nama_cabang: true },
-        },
-        courier: {
-          select: { id_kurir: true, nama_kurir: true, nomor_telepon: true },
-        },
+        branch: { select: { id_cabang: true, nama_cabang: true } },
+        courier: { select: { id_kurir: true, nama_kurir: true } },
       },
     });
 
-    if (!order) {
-      return errorResponse(`Order "${id}" not found`, 404);
-    }
+    if (!order) return errorResponse(`Order "${id}" not found`, 404);
 
-    // Check access
-    if (authResult.user.role === 'Admin' && authResult.user.id_cabang !== order.id_cabang) {
-      return errorResponse('Access denied', 403);
-    }
-
-    return jsonResponse({
-      success: true,
-      data: { order },
-    });
+    return jsonResponse({ success: true, data: { order } });
   } catch (error) {
-    console.error('[Order] Get one error:', error);
+    console.error('[Order] GET error:', error);
     return errorResponse('Internal server error', 500);
   }
 }
 
-/**
- * Update Order Status
- * PATCH /api/orders/[id]/status
- */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -74,53 +54,46 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    const url = new URL(request.url);
+    const action = url.pathname.split('/').pop();
     const authHeader = request.headers.get('authorization');
     const authResult = requireAuth(authHeader);
 
-    if (!authResult.authorized) {
-      return errorResponse(authResult.error, authResult.status);
+    if (!authResult.authorized) return errorResponse(authResult.error, authResult.status);
+
+    if (action === 'assign') {
+      const body = await request.json() as { id_kurir: string };
+      if (!body.id_kurir) return errorResponse('ID Kurir required', 400);
+
+      const order = await prisma.order.update({
+        where: { id_order: id },
+        data: {
+          id_kurir: body.id_kurir,
+          status: 'Dialokasikan',
+          assigned_at: new Date(),
+        },
+      });
+
+      return jsonResponse({ success: true, data: { order } });
     }
 
-    const body = await request.json();
+    const body = await request.json() as { status?: string };
+    if (!body.status) return errorResponse('Status required', 400);
 
-    if (!body.status) {
-      return errorResponse('Status is required', 400);
-    }
-
-    // Status flow validation
     const validStatuses = ['Pending', 'Dialokasikan', 'OnRoute', 'PickingUp', 'Delivering', 'Selesai', 'Done', 'Lunas'];
-    if (!validStatuses.includes(body.status)) {
-      return errorResponse('Invalid status', 400);
-    }
+    if (!validStatuses.includes(body.status)) return errorResponse('Invalid status', 400);
 
-    const order = await prisma.order.findUnique({
-      where: { id_order: id },
-    });
-
-    if (!order) {
-      return errorResponse(`Order "${id}" not found`, 404);
-    }
-
-    // Check access
-    if (authResult.user.role === 'Admin' && authResult.user.id_cabang !== order.id_cabang) {
-      return errorResponse('Access denied', 403);
-    }
-
-    const updated = await prisma.order.update({
+    const order = await prisma.order.update({
       where: { id_order: id },
       data: {
         status: body.status,
-        tanggal_selesai: body.status === 'Done' || body.status === 'Selesai' ? new Date() : undefined,
+        tanggal_selesai: ['Done', 'Selesai'].includes(body.status) ? new Date() : undefined,
       },
     });
 
-    return jsonResponse({
-      success: true,
-      message: `Order status updated to ${body.status}`,
-      data: { order: updated },
-    });
+    return jsonResponse({ success: true, message: `Status updated to ${body.status}`, data: { order } });
   } catch (error) {
-    console.error('[Order] Update status error:', error);
+    console.error('[Order] PATCH error:', error);
     return errorResponse('Internal server error', 500);
   }
 }
