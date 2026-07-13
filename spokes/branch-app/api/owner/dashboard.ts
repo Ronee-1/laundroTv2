@@ -5,9 +5,9 @@
  */
 
 import { prisma } from '../../lib/prisma';
-import { requireRole } from '../utils/auth';
-import { getCorsHeaders } from '../utils/cors';
-import { jsonResponse, errorResponse } from '../utils/response';
+import { requireRole } from '../../utils/auth';
+import { getCorsHeaders } from '../../utils/cors';
+import { jsonResponse, errorResponse } from '../../utils/response';
 
 export async function GET(request: Request) {
   try {

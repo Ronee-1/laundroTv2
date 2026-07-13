@@ -3,7 +3,7 @@
  * GET /api/health
  */
 
-import { jsonResponse } from './utils/response';
+import { jsonResponse } from '../utils/response';
 
 export async function GET() {
   return jsonResponse({

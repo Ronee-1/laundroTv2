@@ -5,9 +5,9 @@
 
 import bcrypt from 'bcrypt';
 import { prisma } from '../../lib/prisma';
-import { generateToken } from '../utils/auth';
-import { getCorsHeaders } from '../utils/cors';
-import { jsonResponse, errorResponse } from '../utils/response';
+import { generateToken } from '../../utils/auth';
+import { getCorsHeaders } from '../../utils/cors';
+import { jsonResponse, errorResponse } from '../../utils/response';
 import { withAuthRateLimit } from '../utils/rateLimit';
 
 const BCRYPT_SALT_ROUNDS = 12;
