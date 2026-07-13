@@ -2,10 +2,11 @@
   "name": "laundrot",
   "version": "2.0.0",
   "private": true,
-  "description": "Multi-branch laundry management system — Hub-and-Spoke architecture",
+  "description": "Multi-branch laundry management system",
   "scripts": {
     "dev": "cd spokes/branch-app && npm run dev",
     "build": "cd spokes/branch-app && npm install --legacy-peer-deps && npm run build",
+    "build:api": "cd api && npm install && npx prisma generate",
     "typecheck": "cd spokes/branch-app && npm run typecheck"
   },
   "engines": {
