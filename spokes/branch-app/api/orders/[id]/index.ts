@@ -1,14 +1,14 @@
 /**
  * Order API - Consolidated
  * GET /api/orders/:id
- * PATCH /api/orders/:id (status update)
+ * PATCH /api/orders/:id
  * POST /api/orders/:id/assign
  */
 
 import { prisma } from '../../../lib/prisma';
-import { requireAuth } from '../../utils/auth';
-import { getCorsHeaders } from '../../utils/cors';
-import { jsonResponse, errorResponse } from '../../utils/response';
+import { requireAuth } from '../../../utils/auth';
+import { getCorsHeaders } from '../../../utils/cors';
+import { jsonResponse, errorResponse } from '../../../utils/response';
 
 export async function GET(
   request: Request,

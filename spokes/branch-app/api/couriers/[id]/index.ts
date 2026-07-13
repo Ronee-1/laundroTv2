@@ -5,9 +5,9 @@
  */
 
 import { prisma } from '../../../lib/prisma';
-import { requireAuth } from '../../utils/auth';
-import { getCorsHeaders } from '../../utils/cors';
-import { jsonResponse, errorResponse } from '../../utils/response';
+import { requireAuth } from '../../../utils/auth';
+import { getCorsHeaders } from '../../../utils/cors';
+import { jsonResponse, errorResponse } from '../../../utils/response';
 
 export async function GET(
   request: Request,
@@ -72,7 +72,7 @@ export async function PATCH(
     }
 
     const { id: id_kurir } = await params;
-    const body = await request.json() as { is_available?: boolean; id_kurir?: string };
+    const body = await request.json() as { is_available?: boolean };
     const authHeader = request.headers.get('authorization');
     const authResult = requireAuth(authHeader);
 
