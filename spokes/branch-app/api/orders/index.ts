@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const authResult = requireAuth(authHeader);
 
     if (!authResult.authorized) {
-      return errorResponse(authResult.error, authResult.status);
+      return jsonResponse({ success: false, error: authResult.error }, authResult.status);
     }
 
     const url = new URL(request.url);
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const authResult = requireAuth(authHeader);
 
     if (!authResult.authorized) {
-      return errorResponse(authResult.error, authResult.status);
+      return jsonResponse({ success: false, error: authResult.error }, authResult.status);
     }
 
     const body = await request.json();

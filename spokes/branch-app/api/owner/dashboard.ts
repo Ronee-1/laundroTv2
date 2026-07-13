@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const authResult = requireRole(authHeader, 'Owner');
 
     if (!authResult.authorized) {
-      return errorResponse(authResult.error, authResult.status);
+      return jsonResponse({ success: false, error: authResult.error }, authResult.status);
     }
 
     // Get all branches with their inventory

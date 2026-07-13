@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const authResult = requireRole(authHeader, 'Owner');
 
     if (!authResult.authorized) {
-      return errorResponse(authResult.error, authResult.status);
+      return jsonResponse({ success: false, error: authResult.error }, authResult.status);
     }
 
     const body: CreateUserRequest = await request.json();
