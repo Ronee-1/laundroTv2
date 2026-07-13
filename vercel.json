@@ -1,0 +1,111 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": null,
+  "regions": ["sin1"],
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs22.x",
+      "memory": 512,
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "/api/health.ts"
+    },
+    {
+      "src": "/api/auth/login",
+      "dest": "/api/auth/login.ts"
+    },
+    {
+      "src": "/api/auth/me",
+      "dest": "/api/auth/me.ts"
+    },
+    {
+      "src": "/api/auth/register",
+      "dest": "/api/auth/register.ts"
+    },
+    {
+      "src": "/api/branches",
+      "dest": "/api/branches/index.ts"
+    },
+    {
+      "src": "/api/branches/(?<id>[^/]+)/customer",
+      "dest": "/api/branches/[id]/customer.ts"
+    },
+    {
+      "src": "/api/branches/(?<id>[^/]+)/reconcile",
+      "dest": "/api/branches/[id]/reconcile.ts"
+    },
+    {
+      "src": "/api/branches/(?<id>[^/]+)",
+      "dest": "/api/branches/[id].ts"
+    },
+    {
+      "src": "/api/orders",
+      "dest": "/api/orders/index.ts"
+    },
+    {
+      "src": "/api/orders/(?<id>[^/]+)/status",
+      "dest": "/api/orders/[id]/status.ts"
+    },
+    {
+      "src": "/api/orders/(?<id>[^/]+)",
+      "dest": "/api/orders/[id].ts"
+    },
+    {
+      "src": "/api/couriers/(?<id>[^/]+)/tasks",
+      "dest": "/api/couriers/[id]/tasks.ts"
+    },
+    {
+      "src": "/api/owner/dashboard",
+      "dest": "/api/owner/dashboard.ts"
+    },
+    {
+      "src": "/api/expenses",
+      "dest": "/api/expenses/index.ts"
+    },
+    {
+      "src": "/api/inventory/(?<id>[^/]+)",
+      "dest": "/api/inventory/[id_cabang].ts"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/not-found.ts"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
