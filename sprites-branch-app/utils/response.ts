@@ -12,6 +12,6 @@ export function jsonResponse(data: unknown, status = 200) {
 export function errorResponse(message: string, status = 500) {
   return new Response(
     JSON.stringify({ success: false, error: message }),
-    { status, headers: { 'Content-Type': 'application/json' },
+    { status, headers: { 'Content-Type': 'application/json' } }
   );
 }

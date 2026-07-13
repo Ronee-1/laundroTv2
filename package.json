@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "cd spokes/branch-app && npm run dev",
     "build": "cd spokes/branch-app && npm install --legacy-peer-deps && npm run build",
-    "build:prisma": "cd api && npx prisma generate",
-    "typecheck": "cd spokes/branch-app && npm run typecheck"
+    "build:api": "cd api && npm install && npx prisma generate",
+    "build:all": "npm run build:api && npm run build",
+    "typecheck": "cd spokes/branch-app && npm run typecheck",
+    "prisma:generate": "cd api && npx prisma generate",
+    "prisma:migrate": "cd api && npx prisma migrate deploy",
+    "prisma:studio": "cd api && npx prisma studio"
   },
   "engines": {
     "node": ">=18.0.0"

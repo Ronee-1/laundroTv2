@@ -3,7 +3,7 @@
  * POST /api/auth/login
  */
 
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { generateToken } from '../utils/auth';
 import { getCorsHeaders } from '../utils/cors';
