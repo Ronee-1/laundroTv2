@@ -15,7 +15,7 @@ export interface JwtPayload {
 }
 
 /**
- * Generate JWT token for authenticated user
+ * Generate JWT token
  */
 export function generateToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
@@ -37,10 +37,8 @@ export function verifyToken(token: string): JwtPayload | null {
  */
 export function extractToken(authHeader: string | null): string | null {
   if (!authHeader) return null;
-
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
-
   return parts[1];
 }
 
@@ -50,13 +48,9 @@ export function extractToken(authHeader: string | null): string | null {
 export function authenticateRequest(authHeader: string | null): JwtPayload | null {
   const token = extractToken(authHeader);
   if (!token) return null;
-
   return verifyToken(token);
 }
 
-/**
- * Role-based access control type
- */
 type Role = 'Owner' | 'Admin' | 'Kurir';
 
 /**
@@ -68,19 +62,13 @@ export function hasRole(user: JwtPayload | null, ...allowedRoles: Role[]): boole
 }
 
 /**
- * Require authentication middleware
+ * Require authentication
  */
 export function requireAuth(authHeader: string | null): { authorized: true; user: JwtPayload } | { authorized: false; error: string; status: number } {
   const user = authenticateRequest(authHeader);
-
   if (!user) {
-    return {
-      authorized: false,
-      error: 'Authentication required',
-      status: 401
-    };
+    return { authorized: false, error: 'Authentication required', status: 401 };
   }
-
   return { authorized: true, user };
 }
 
@@ -91,10 +79,10 @@ export function requireRole(authHeader: string | null, ...allowedRoles: Role[]):
   | { authorized: true; user: JwtPayload }
   | { authorized: false; error: string; status: number } {
 
-  const authResult = requireAuth(authHeader);
-  if (!authResult.authorized) return authResult;
+  const result = requireAuth(authHeader);
+  if (!result.authorized) return result;
 
-  if (!hasRole(authResult.user, ...allowedRoles)) {
+  if (!hasRole(result.user, ...allowedRoles)) {
     return {
       authorized: false,
       error: `Access denied. Required role: ${allowedRoles.join(' or ')}`,
@@ -102,5 +90,5 @@ export function requireRole(authHeader: string | null, ...allowedRoles: Role[]):
     };
   }
 
-  return { authorized: true, user: authResult.user };
+  return { authorized: true, user: result.user };
 }

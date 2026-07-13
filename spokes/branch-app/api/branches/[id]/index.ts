@@ -6,9 +6,9 @@
  */
 
 import { prisma } from '../../../lib/prisma';
-import { requireAuth, requireRole } from '../../utils/auth';
-import { getCorsHeaders } from '../../utils/cors';
-import { jsonResponse, errorResponse } from '../../utils/response';
+import { requireAuth, requireRole } from '../../../utils/auth';
+import { getCorsHeaders } from '../../../utils/cors';
+import { jsonResponse, errorResponse } from '../../../utils/response';
 
 export async function GET(
   request: Request,
@@ -30,7 +30,6 @@ export async function GET(
     const url = new URL(request.url);
     const action = url.pathname.split('/').pop();
 
-    // Handle reconcile endpoint
     if (action === 'reconcile') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -39,30 +38,17 @@ export async function GET(
         where: { id_cabang: id, tanggal_jurnal: { gte: today } },
       });
 
-      const kasDigital = cashEntries.reduce((sum, e) => {
-        return e.tipe === 'Pemasukan' ? sum + e.nominal : sum - e.nominal;
-      }, 0);
+      const kasDigital = cashEntries.reduce((sum, e) => e.tipe === 'Pemasukan' ? sum + e.nominal : sum - e.nominal, 0);
 
-      const kasFisik = 0; // Will be sent in POST
-      const selisih = kasFisik - kasDigital;
-
-      return jsonResponse({
-        success: true,
-        data: { kasDigital, kasFisik, selisih },
-      });
+      return jsonResponse({ success: true, data: { kasDigital, kasFisik: 0, selisih: kasDigital } });
     }
 
     const branch = await prisma.branch.findUnique({
       where: { id_cabang: id },
-      include: {
-        couriers: true,
-        _count: { select: { orders: true, customers: true } },
-      },
+      include: { couriers: true, _count: { select: { orders: true, customers: true } } },
     });
 
-    if (!branch) {
-      return errorResponse(`Branch "${id}" not found`, 404);
-    }
+    if (!branch) return errorResponse(`Branch "${id}" not found`, 404);
 
     return jsonResponse({ success: true, data: { branch } });
   } catch (error) {
@@ -80,7 +66,7 @@ export async function POST(
       return new Response(null, { status: 204, headers: getCorsHeaders() });
     }
 
-    const { id: id_cabang } = await params;
+    const { id } = await params;
     const url = new URL(request.url);
     const action = url.pathname.split('/').pop();
     const authHeader = request.headers.get('authorization');
@@ -90,7 +76,6 @@ export async function POST(
       if (!authResult.authorized) return errorResponse(authResult.error, authResult.status);
 
       const body = await request.json() as { nama: string; whatsapp: string; alamat_maps: string; google_maps_url?: string };
-
       if (!body.nama || !body.whatsapp || !body.alamat_maps) {
         return errorResponse('Missing required fields', 400);
       }
@@ -98,7 +83,7 @@ export async function POST(
       const customer = await prisma.customer.create({
         data: {
           id_pelanggan: `CUST-${Date.now().toString(36).toUpperCase()}`,
-          id_cabang,
+          id_cabang: id,
           nama: body.nama,
           whatsapp: body.whatsapp,
           alamat_maps: body.alamat_maps,
@@ -118,7 +103,7 @@ export async function POST(
       today.setHours(0, 0, 0, 0);
 
       const cashEntries = await prisma.cashBookEntry.findMany({
-        where: { id_cabang, tanggal_jurnal: { gte: today } },
+        where: { id_cabang: id, tanggal_jurnal: { gte: today } },
       });
 
       const kasDigital = cashEntries.reduce((sum, e) => e.tipe === 'Pemasukan' ? sum + e.nominal : sum - e.nominal, 0);
@@ -126,7 +111,7 @@ export async function POST(
 
       const reconciliation = await prisma.reconciliationLog.create({
         data: {
-          id_cabang,
+          id_cabang: id,
           kas_digital: kasDigital,
           kas_fisik: body.kas_fisik,
           selisih,
