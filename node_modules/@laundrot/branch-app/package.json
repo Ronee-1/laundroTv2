@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx prisma generate && tsc -b && vite build",
-    "build:frontend": "tsc -b && vite build",
+    "build": "npx prisma generate && vite build",
+    "build:full": "npx prisma generate && tsc -b && vite build",
     "postinstall": "prisma generate",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
