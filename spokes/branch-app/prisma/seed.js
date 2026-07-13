@@ -1,10 +1,10 @@
 /**
  * Seed Script for LaundroT Database
- * Run with: npx prisma db seed
+ * Run with: npm run seed
  */
 
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
