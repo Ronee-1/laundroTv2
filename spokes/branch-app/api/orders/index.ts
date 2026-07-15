@@ -1,13 +1,31 @@
 /**
  * Orders API - Get All Orders
  * GET /api/orders
- * Query params: id_cabang, status, limit, offset
+ * Query params: id_cabang, status, limit, offset, incoming
  */
 
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../utils/auth';
 import { getCorsHeaders } from '../../utils/cors';
 import { jsonResponse, errorResponse } from '../../utils/response';
+
+/**
+ * Extract coordinates from Google Maps URL
+ */
+function extractCoordinatesFromGmapsUrl(url: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  try {
+    const atMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    const qMatch = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    const destMatch = url.match(/destination=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (destMatch) return { lat: parseFloat(destMatch[1]), lng: parseFloat(destMatch[2]) };
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -25,6 +43,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const id_cabang = url.searchParams.get('id_cabang');
     const status = url.searchParams.get('status');
+    const incoming = url.searchParams.get('incoming') === 'true';
     const limit = parseInt(url.searchParams.get('limit') || '50');
     const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -40,6 +59,11 @@ export async function GET(request: Request) {
 
     if (status) {
       where.status = status;
+    }
+
+    // Jika incoming=true, hanya order yang belum ditugaskan
+    if (incoming) {
+      where.id_kurir = null;
     }
 
     const [orders, total] = await Promise.all([
@@ -60,14 +84,92 @@ export async function GET(request: Request) {
       prisma.order.count({ where }),
     ]);
 
+    // Normalize WhatsApp for matching
+    function normalizeWhatsApp(wa: string): string {
+      return wa.replace(/[^0-9]/g, '');
+    }
+
+    // Get customer data
+    const customerIds = orders.map(o => o.id_pelanggan).filter(Boolean);
+    const whatsappNumbers = orders.map(o => o.customer_whatsapp).filter(Boolean);
+
+    const customers = await prisma.customer.findMany({
+      where: {
+        OR: [
+          { id_pelanggan: { in: customerIds } },
+          { whatsapp: { in: whatsappNumbers } },
+        ],
+      },
+      select: {
+        id_pelanggan: true,
+        nama: true,
+        whatsapp: true,
+        alamat_maps: true,
+        google_maps_url: true,
+      },
+    });
+
+    const customerMapById = new Map(customers.map(c => [c.id_pelanggan, c]));
+    const customerMapByWhatsapp = new Map(
+      customers.filter(c => c.whatsapp).map(c => [normalizeWhatsApp(c.whatsapp), c])
+    );
+
+    // Transform orders with customer data
+    const ordersWithCustomer = orders.map(order => {
+      let customer = customerMapById.get(order.id_pelanggan);
+      if (!customer && order.customer_whatsapp) {
+        customer = customerMapByWhatsapp.get(normalizeWhatsApp(order.customer_whatsapp));
+      }
+
+      // Prioritas GMaps URL
+      const gmapsUrl = order.google_maps_url || customer?.alamat_maps || customer?.google_maps_url || '';
+
+      // Extract coordinates
+      let lat = order.latitude_penjemputan;
+      let lng = order.longitude_penjemputan;
+
+      if ((lat === 0 || lng === 0) && gmapsUrl) {
+        const coords = extractCoordinatesFromGmapsUrl(gmapsUrl);
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+        }
+      }
+
+      const navigationUrl = (lat !== 0 && lng !== 0)
+        ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+        : gmapsUrl;
+
+      return {
+        id_order: order.id_order,
+        customer_name: order.customer_name || customer?.nama || '',
+        customer_whatsapp: order.customer_whatsapp || customer?.whatsapp || '',
+        service_type: order.service_type || '',
+        service_name: order.service_name || '',
+        wilayah: order.wilayah || '',
+        berat_kg: order.berat_kg ?? 0,
+        alamat_penjemputan: order.alamat_penjemputan || '',
+        google_maps_url: navigationUrl,
+        gmaps_link: gmapsUrl,
+        latitude: lat,
+        longitude: lng,
+        status: order.status,
+        tanggal_order: order.tanggal_order?.toISOString() || new Date().toISOString(),
+        // Include full order data
+        id_kurir: order.id_kurir,
+        id_cabang: order.id_cabang,
+        catatan: order.catatan,
+        total_harga: order.total_harga,
+        source: order.source,
+        assigned_at: order.assigned_at?.toISOString(),
+      };
+    });
+
     return jsonResponse({
       success: true,
-      data: {
-        total,
-        limit,
-        offset,
-        orders,
-      },
+      id_cabang,
+      total_orders: ordersWithCustomer.length,
+      orders: ordersWithCustomer,
     });
   } catch (error) {
     console.error('[Orders] Get all error:', error);

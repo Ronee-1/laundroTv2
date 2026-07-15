@@ -484,6 +484,100 @@ const plastikRecommendation = Math.max(0, 500 - plastikStock.stok_saat_ini);
 
 ---
 
+### FR-015: Pilihan Metode Pembayaran Tunai / Non-Tunai
+| Atribut | Detail |
+|---------|--------|
+| **ID** | FR-SERVICE-02 |
+| **Trigger** | Admin Outlet mengakses halaman Input Layanan Outlet |
+| **Aktor** | Admin Outlet |
+| **Deskripsi** | Sistem menyediakan pilihan metode pembayaran Tunai atau Non-Tunai pada saat input order layanan, dengan tampilan visual yang jelas untuk membedakan kedua metode |
+
+**Implementasi:**
+- `spokes/branch-app/src/components/OutletReception.tsx`
+- `api/orders/index.ts` — accept `metode_pembayaran` field
+- `prisma/schema.prisma` — add `metode_pembayaran` field to Order model
+
+**Metode Pembayaran:**
+| Metode | Icon | Warna Badge | Keterangan |
+|--------|------|-------------|------------|
+| Tunai | 💵 | Green (#22c55e) | Pembayaran langsung di outlet |
+| Non-Tunai | 💳 | Purple (#a855f7) | Pembayaran via transfer/e-wallet |
+
+**UI Specification:**
+```tsx
+// Payment method toggle buttons
+<div className="grid grid-cols-2 gap-3">
+  <button
+    type="button"
+    onClick={() => setPaymentMethod('Tunai')}
+    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 ${
+      paymentMethod === 'Tunai'
+        ? 'border-deep-blue bg-blue-50 text-deep-blue'
+        : 'border-slate-200 bg-white text-slate-600'
+    }`}
+  >
+    <svg className="w-5 h-5">💵</svg>
+    <span>Tunai</span>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setPaymentMethod('Non-Tunai')}
+    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 ${
+      paymentMethod === 'Non-Tunai'
+        ? 'border-deep-blue bg-blue-50 text-deep-blue'
+        : 'border-slate-200 bg-white text-slate-600'
+    }`}
+  >
+    <svg className="w-5 h-5">💳</svg>
+    <span>Non-Tunai</span>
+  </button>
+</div>
+```
+
+**Price Breakdown Display:**
+```tsx
+<div className="flex justify-between items-center">
+  <span>Metode Bayar</span>
+  <span className={`badge ${
+    paymentMethod === 'Tunai'
+      ? 'bg-green-100 text-green-700'
+      : 'bg-purple-100 text-purple-700'
+  }`}>
+    {paymentMethod === 'Tunai' ? '💵 Tunai' : '💳 Non-Tunai'}
+  </span>
+</div>
+```
+
+**Database Schema Update:**
+```prisma
+model Order {
+  // ... existing fields
+  metode_pembayaran String? @default("Tunai")
+
+  @@index([metode_pembayaran])
+}
+```
+
+**API Request Body:**
+```typescript
+{
+  id_pelanggan: string,
+  customer_name: string,
+  customer_whatsapp: string,
+  id_layanan: string,
+  service_name: string,
+  qty: number,
+  satuan: string,
+  berat_kg: number,
+  total_harga: number,
+  status: "Diproses",
+  metode_pembayaran: "Tunai" | "Non-Tunai"  // NEW
+}
+```
+
+---
+
 ## Appendix: Endpoint Summary
 
 | Method | Endpoint | FR Coverage |
@@ -506,3 +600,4 @@ const plastikRecommendation = Math.max(0, 500 - plastikStock.stok_saat_ini);
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-07-06 | System | Initial FR alignment with codebase |
+| 1.1 | 2026-07-15 | System | Added FR-015: Pilihan Metode Pembayaran Tunai / Non-Tunai |

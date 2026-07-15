@@ -77,16 +77,17 @@ export async function PATCH(
       return jsonResponse({ success: true, data: { order } });
     }
 
-    const body = await request.json() as { status?: string };
+    const body = await request.json() as { status?: string; catatan?: string };
     if (!body.status) return errorResponse('Status required', 400);
 
-    const validStatuses = ['Pending', 'Dialokasikan', 'OnRoute', 'PickingUp', 'Delivering', 'Selesai', 'Done', 'Lunas'];
+    const validStatuses = ['Pending', 'Diproses', 'Dialokasikan', 'OnRoute', 'PickingUp', 'Delivering', 'Selesai', 'Done', 'Lunas', 'Gagal'];
     if (!validStatuses.includes(body.status)) return errorResponse('Invalid status', 400);
 
     const order = await prisma.order.update({
       where: { id_order: id },
       data: {
         status: body.status,
+        catatan: body.catatan || undefined,
         tanggal_selesai: ['Done', 'Selesai'].includes(body.status) ? new Date() : undefined,
       },
     });

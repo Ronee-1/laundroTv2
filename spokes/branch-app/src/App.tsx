@@ -19,15 +19,16 @@ import { WhatsAppOrderHub } from './components/WhatsAppOrderHub';
 import { IncomingOrders } from './components/IncomingOrders';
 import { CourierAssignment } from './components/CourierAssignment';
 import { OutletReception } from './components/OutletReception';
+import { UserManagement } from './components/UserManagement';
 
 // ==========================================
-// PAGE TYPES - FR-LOG-02, FR-SERVICE-01 Integration
+// PAGE TYPES - FR-LOG-02, FR-SERVICE-01, RBAC Integration
 // 'incoming-orders' = Pesanan masuk dari WhatsApp Hub
 // 'admin-dashboard' = Dashboard Admin Branch
 // 'courier-assignment' = FR-005: Alokasi & Plot Tugas Kurir
 // 'outlet-reception' = FR-SERVICE-01: Input layanan dengan kalkulasi otomatis
 // ==========================================
-export type Page = 'tugas' | 'dashboard' | 'admin-dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir' | 'input-pelanggan' | 'whatsapp-hub' | 'incoming-orders' | 'courier-assignment' | 'outlet-reception';
+export type Page = 'tugas' | 'dashboard' | 'admin-dashboard' | 'expense' | 'audit' | 'inventaris' | 'kurir' | 'input-pelanggan' | 'whatsapp-hub' | 'incoming-orders' | 'courier-assignment' | 'outlet-reception' | 'user-management';
 export type UserRole = 'Owner' | 'Admin' | 'Kurir';
 
 export interface Notification {
@@ -277,6 +278,11 @@ function AppContent() {
             <IncomingOrders
               selectedAdminBranch={selectedAdminBranch}
               triggerNotification={triggerNotification}
+            />
+          )}
+          {page === 'user-management' && userRole === 'Owner' && (
+            <UserManagement
+              onNotification={(msg, type) => triggerNotification(msg, type || 'success')}
             />
           )}
         </main>

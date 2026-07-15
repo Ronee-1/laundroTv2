@@ -135,6 +135,7 @@ export async function POST(request: Request) {
         wilayah: body.wilayah,
         source: body.source || 'outlet',
         assigned_by: authResult.user.id_user,
+        metode_pembayaran: body.metode_pembayaran || 'Tunai',
       },
     });
 

@@ -2,10 +2,14 @@
 // PENERIMAAN & INPUT LAYANAN OUTLET - FR-SERVICE-01
 // Halaman untuk Admin Outlet memproses pakaian yang dikembalikan kurir
 // Dengan kalkulasi otomatis harga dari database tarif
+// Dengan pilihan metode pembayaran Tunai / Non-Tunai
 // ==========================================
 
 import { useState, useEffect, useMemo } from 'react';
 import type { UserRole } from '../App.tsx';
+
+// Payment method types
+export type PaymentMethod = 'Tunai' | 'Non-Tunai';
 
 // Service tariff interface (matches backend)
 interface ServiceTariff {
@@ -62,6 +66,7 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tunai');
   const [submitting, setSubmitting] = useState(false);
 
   // Calculate total price automatically
@@ -161,6 +166,7 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
           berat_kg: selectedSvc.satuan === 'kg' ? qty : 0,
           total_harga: totalHarga,
           status: 'Diproses',
+          metode_pembayaran: paymentMethod,
         }),
       });
 
@@ -168,13 +174,14 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
 
       if (res.ok && json.success) {
         triggerNotification(
-          `Order berhasil dicatat! Total: ${formatIDR(totalHarga)} (${qty} ${selectedSvc.satuan} × ${formatIDR(selectedSvc.harga_per_satuan)})`,
+          `Order berhasil dicatat! Total: ${formatIDR(totalHarga)} (${paymentMethod}) - ${qty} ${selectedSvc.satuan} × ${formatIDR(selectedSvc.harga_per_satuan)}`,
           'success'
         );
         // Reset form
         setSelectedCustomer('');
         setSelectedService('');
         setQuantity('');
+        setPaymentMethod('Tunai');
       } else {
         triggerNotification(json.error ?? 'Gagal menyimpan order', 'error');
       }
@@ -283,6 +290,51 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
             </div>
           </div>
 
+          {/* Metode Pembayaran */}
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+              Metode Pembayaran
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Tunai */}
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('Tunai')}
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 transition-all ${
+                  paymentMethod === 'Tunai'
+                    ? 'border-deep-blue bg-blue-50 text-deep-blue'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="font-medium text-sm">Tunai</span>
+              </button>
+
+              {/* Non-Tunai */}
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('Non-Tunai')}
+                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 transition-all ${
+                  paymentMethod === 'Non-Tunai'
+                    ? 'border-deep-blue bg-blue-50 text-deep-blue'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span className="font-medium text-sm">Non-Tunai</span>
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              {paymentMethod === 'Tunai'
+                ? '💵 Pembayaran langsung di outlet (kas masuk hari ini)'
+                : '💳 Pembayaran via transfer/e-wallet (proses verifikasi)'}
+            </p>
+          </div>
+
           {/* Price Breakdown */}
           {selectedServiceData && quantity && (
             <div className="bg-base-bg rounded-xl p-4 border border-slate-100">
@@ -298,6 +350,16 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
                   <span className="text-slate-600">Qty/ Berat</span>
                   <span className="font-medium text-navy">
                     {quantity} {selectedServiceData.satuan}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">Metode Bayar</span>
+                  <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${
+                    paymentMethod === 'Tunai'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {paymentMethod === 'Tunai' ? '💵 Tunai' : '💳 Non-Tunai'}
                   </span>
                 </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">

@@ -59,10 +59,17 @@ interface Courier {
 interface UnassignedOrder {
   id_order: string;
   customer_name?: string;
+  customer_whatsapp?: string;
   alamat_penjemputan: string;
   berat_kg?: number;
   status: string;
   google_maps_url?: string;
+  gmaps_link?: string;
+  latitude?: number;
+  longitude?: number;
+  service_type?: string;
+  service_name?: string;
+  wilayah?: string;
 }
 
 interface Props {

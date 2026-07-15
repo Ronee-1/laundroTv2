@@ -294,6 +294,30 @@ router.post(
 // Branch admin can view orders allocated from WhatsApp Hub
 // ==========================================
 
+// Helper function to extract coordinates from Google Maps URL
+function extractCoordinatesFromGmapsUrl(url: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  try {
+    // Pattern: @lat,lng
+    const atMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    // Pattern: ?q=lat,lng
+    const qMatch = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    // Pattern: destination=lat,lng
+    const destMatch = url.match(/destination=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (destMatch) return { lat: parseFloat(destMatch[1]), lng: parseFloat(destMatch[2]) };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Normalize WhatsApp number for matching
+function normalizeWhatsApp(wa: string): string {
+  return wa.replace(/[^0-9]/g, '');
+}
+
 interface BranchIncomingOrdersResponse {
   success: true;
   id_cabang: string;
@@ -303,11 +327,14 @@ interface BranchIncomingOrdersResponse {
     customer_name: string;
     customer_whatsapp: string;
     service_type: string;
+    service_name: string;
     wilayah: string;
     berat_kg: number;
     alamat_penjemputan: string;
     google_maps_url: string;
-    koordinat_penjemputan: { latitude: number; longitude: number };
+    gmaps_link: string;
+    latitude: number;
+    longitude: number;
     status: string;
     tanggal_order: string;
   }>;
@@ -340,30 +367,75 @@ router.get(
           orderBy: { tanggal_order: 'desc' },
         });
 
-        // Transform to expected format
-        dbOrders = prismaOrders.map((o: any) => ({
-          id_order: o.id_order,
-          id_cabang: o.id_cabang,
-          customer_name: o.customer_name || 'Unknown',
-          customer_whatsapp: o.customer_whatsapp || '',
-          service_type: o.service_type || o.service_name || 'Laundry',
-          service_name: o.service_name || '',
-          wilayah: o.wilayah || '',
-          berat_kg: o.berat_kg || 0,
-          qty: o.qty || 0,
-          alamat_penjemputan: o.alamat_penjemputan || '',
-          google_maps_url: o.google_maps_url || '',
-          koordinat_penjemputan: {
-            latitude: o.latitude_penjemputan || 0,
-            longitude: o.longitude_penjemputan || 0,
+        // Get all customers for this branch
+        const allCustomers = await prisma.customer.findMany({
+          where: { id_cabang },
+          select: {
+            id_pelanggan: true,
+            nama: true,
+            whatsapp: true,
+            alamat_maps: true,
+            google_maps_url: true,
           },
-          status: o.status,
-          tanggal_order: o.tanggal_order,
-          source: o.source || 'whatsapp',
-          id_kurir: o.id_kurir || undefined,
-        }));
+        });
+
+        // Create customer lookup maps
+        const customerMapById = new Map(allCustomers.map(c => [c.id_pelanggan, c]));
+        const customerMapByWhatsApp = new Map(
+          allCustomers.filter(c => c.whatsapp).map(c => [normalizeWhatsApp(c.whatsapp), c])
+        );
+
+        // Transform and join with customer data
+        dbOrders = prismaOrders.map((o: any) => {
+          // Find customer by id_pelanggan or whatsapp
+          let customer = customerMapById.get(o.id_pelanggan);
+          if (!customer && o.customer_whatsapp) {
+            customer = customerMapByWhatsApp.get(normalizeWhatsApp(o.customer_whatsapp));
+          }
+
+          // Prioritas GMaps URL: order.google_maps_url > customer.alamat_maps > customer.google_maps_url
+          const gmapsUrl = o.google_maps_url || customer?.alamat_maps || customer?.google_maps_url || '';
+
+          // Extract coordinates
+          let lat = o.latitude_penjemputan || 0;
+          let lng = o.longitude_penjemputan || 0;
+
+          if ((lat === 0 || lng === 0) && gmapsUrl) {
+            const coords = extractCoordinatesFromGmapsUrl(gmapsUrl);
+            if (coords) {
+              lat = coords.lat;
+              lng = coords.lng;
+            }
+          }
+
+          // Navigation URL for Google Maps
+          const navigationUrl = (lat !== 0 && lng !== 0)
+            ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+            : gmapsUrl;
+
+          return {
+            id_order: o.id_order,
+            id_cabang: o.id_cabang,
+            customer_name: o.customer_name || customer?.nama || 'Unknown',
+            customer_whatsapp: o.customer_whatsapp || customer?.whatsapp || '',
+            service_type: o.service_type || o.service_name || 'Laundry',
+            service_name: o.service_name || '',
+            wilayah: o.wilayah || '',
+            berat_kg: o.berat_kg || 0,
+            alamat_penjemputan: o.alamat_penjemputan || '',
+            google_maps_url: navigationUrl,
+            gmaps_link: gmapsUrl,
+            latitude: lat,
+            longitude: lng,
+            status: o.status,
+            tanggal_order: o.tanggal_order instanceof Date ? o.tanggal_order.toISOString() : String(o.tanggal_order),
+            source: o.source || 'whatsapp',
+            id_kurir: o.id_kurir || undefined,
+          };
+        });
 
         console.log(`[INCOMING ORDERS] Found ${dbOrders.length} orders from database for branch ${id_cabang}`);
+        console.log(`[INCOMING ORDERS] Found ${allCustomers.length} customers in branch ${id_cabang}`);
       } catch (error: any) {
         dbError = error.message;
         console.error('[INCOMING ORDERS] Error fetching from database:', error);
@@ -392,17 +464,19 @@ router.get(
             customer_name: o.customer_name ?? 'Unknown',
             customer_whatsapp: o.customer_whatsapp ?? '',
             service_type: o.service_type ?? 'Laundry Kiloan',
+            service_name: '',
             wilayah: o.wilayah ?? '',
             berat_kg: o.berat_kg ?? 0,
             alamat_penjemputan: o.alamat_penjemputan,
             google_maps_url: o.google_maps_url ?? '',
-            koordinat_penjemputan: o.koordinat_penjemputan,
+            gmaps_link: o.google_maps_url ?? '',
+            latitude: o.koordinat_penjemputan?.latitude ?? 0,
+            longitude: o.koordinat_penjemputan?.longitude ?? 0,
             status: o.status,
             tanggal_order: o.tanggal_order instanceof Date ? o.tanggal_order.toISOString() : String(o.tanggal_order),
             source: 'whatsapp',
           })),
         // Database orders: TAMPILKAN JIKA status BUKAN completed
-        // HAPUS filter isUnassigned agar pesanan yang sudah/tidak ditugaskan tetap muncul
         ...dbOrders
           .filter((o) => !COMPLETED_STATUSES.includes(o.status))
           .map((o) => ({
@@ -410,11 +484,14 @@ router.get(
             customer_name: o.customer_name ?? 'Unknown',
             customer_whatsapp: o.customer_whatsapp ?? '',
             service_type: o.service_type ?? o.service_name ?? 'Layanan Outlet',
+            service_name: o.service_name ?? '',
             wilayah: o.wilayah ?? '',
             berat_kg: o.berat_kg ?? o.qty ?? 0,
             alamat_penjemputan: o.alamat_penjemputan ?? '',
             google_maps_url: o.google_maps_url ?? '',
-            koordinat_penjemputan: o.koordinat_penjemputan ?? { latitude: 0, longitude: 0 },
+            gmaps_link: o.gmaps_link ?? '',
+            latitude: o.latitude ?? 0,
+            longitude: o.longitude ?? 0,
             status: o.status,
             tanggal_order: o.tanggal_order instanceof Date ? o.tanggal_order.toISOString() : String(o.tanggal_order),
             source: o.source ?? 'outlet',

@@ -12,11 +12,14 @@ interface IncomingOrder {
   customer_name: string;
   customer_whatsapp: string;
   service_type: string;
+  service_name: string;
   wilayah: string;
   berat_kg: number;
   alamat_penjemputan: string;
   google_maps_url: string;
-  koordinat_penjemputan: { latitude: number; longitude: number };
+  gmaps_link: string;
+  latitude: number;
+  longitude: number;
   status: string;
   tanggal_order: string;
 }
@@ -56,6 +59,7 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
   // FR-LOG-02: Fetch incoming orders for this branch
   const fetchIncomingOrders = useCallback(async () => {
     try {
+      // Call the correct endpoint: /api/orders/branch/:id_cabang/incoming
       const res = await fetch(`/api/orders/branch/${selectedAdminBranch}/incoming`);
       const json = (await res.json()) as IncomingOrdersResponse;
 
@@ -64,7 +68,7 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
         return;
       }
 
-      setOrders(json.orders);
+      setOrders(json.orders || []);
       setError(null);
     } catch {
       setError('Tidak dapat terhubung ke server.');
@@ -206,7 +210,7 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
         </p>
       </div>
 
-      {/* Orders Grid */}
+      {/* Orders + Detail Grid */}
       {orders.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
           <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,9 +220,153 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
           <p className="text-slate-400 text-xs mt-1">Pesanan baru akan muncul di sini saat Admin Pusat mengalokasikan</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Order Cards */}
-          <div className="space-y-4">
+        <div className="space-y-4">
+          {/* Detail Panel — spans full width above cards */}
+          {selectedOrder && (
+            <div className={`rounded-2xl p-6 transition-all ${
+              assignSuccess?.orderId === selectedOrder.id_order
+                ? 'bg-teal-50 border-2 border-teal-500'
+                : 'bg-white border border-deep-blue'
+            }`}>
+              {assignSuccess?.orderId === selectedOrder.id_order ? (
+                /* Success State */
+                <div className="text-center py-8">
+                  <div className="w-20 h-20 bg-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-teal-700 mb-2">Berhasil!</h3>
+                  <p className="text-sm text-teal-600 mb-1">
+                    Pesanan <span className="font-mono font-semibold">{assignSuccess.orderId}</span>
+                  </p>
+                  <p className="text-sm text-teal-600">
+                    ditugaskan ke <span className="font-semibold">{assignSuccess.courierName}</span>
+                  </p>
+                </div>
+              ) : (
+                /* Normal State */
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-bold text-navy">Detail Pesanan</h3>
+                    <button
+                      onClick={() => setSelectedOrder(null)}
+                      className="text-slate-400 hover:text-slate-600 transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-base-bg rounded-2xl p-4">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">ID Pesanan</p>
+                      <p className="font-mono text-sm font-medium text-navy">{selectedOrder.id_order}</p>
+                    </div>
+
+                    <div className="bg-base-bg rounded-2xl p-4">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pelanggan</p>
+                      <p className="text-sm font-medium text-navy">{selectedOrder.customer_name}</p>
+                    </div>
+
+                    <div className="bg-base-bg rounded-2xl p-4">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">WhatsApp</p>
+                      <p className="font-mono text-xs text-navy">{selectedOrder.customer_whatsapp}</p>
+                    </div>
+
+                    <div className="bg-base-bg rounded-2xl p-4">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Alamat</p>
+                      {selectedOrder.alamat_penjemputan ? (
+                        <p className="text-xs text-navy leading-relaxed">{selectedOrder.alamat_penjemputan}</p>
+                      ) : selectedOrder.gmaps_link || selectedOrder.google_maps_url ? (
+                        <p className="text-xs text-blue-600 italic flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          </svg>
+                          Koordinat GMaps tersedia
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-500 italic">Alamat tidak tersedia</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    {/* Google Maps Navigation - aktif jika ada URL GMaps */}
+                    {(selectedOrder.google_maps_url || selectedOrder.gmaps_link) && (
+                      <a
+                        href={selectedOrder.google_maps_url || selectedOrder.gmaps_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 bg-deep-blue hover:bg-navy text-white rounded-2xl py-3 text-sm font-medium transition-all"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        Buka Google Maps
+                      </a>
+                    )}
+
+                    {/* Courier Assignment */}
+                    {couriers.length > 0 && (
+                      <div className="pt-4 border-t border-slate-200 sm:border-t-0 sm:pt-0">
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                          Tugaskan ke Kurir
+                        </label>
+                        <select
+                          value={selectedCourier}
+                          onChange={(e) => setSelectedCourier(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all"
+                        >
+                          <option value="">Pilih kurir...</option>
+                          {couriers.map((c) => (
+                            <option key={c.id_kurir} value={c.id_kurir}>
+                              {c.nama_kurir}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Confirm Button — full width */}
+                  {couriers.length > 0 && (
+                    <button
+                      onClick={() => handleAssignToCourier(selectedOrder)}
+                      disabled={!selectedCourier || assigning}
+                      className="w-full mt-4 bg-teal hover:bg-teal-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl py-3 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                    >
+                      {assigning ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Memproses...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Konfirmasi & Tugaskan
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {couriers.length === 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-slate-400 text-center">
+                        Belum ada kurir terdaftar di cabang ini
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Order Cards — 2 columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {orders.map((order) => {
               const isSuccess = assignSuccess?.orderId === order.id_order;
               return (
@@ -276,7 +424,9 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <span className="text-xs truncate">{order.wilayah || order.alamat_penjemputan}</span>
+                      <span className={`text-xs truncate ${order.alamat_penjemputan ? '' : order.gmaps_link || order.google_maps_url ? 'text-blue-600' : 'text-red-400'}`}>
+                        {order.wilayah || order.alamat_penjemputan || (order.gmaps_link || order.google_maps_url ? '📍 Koordinat GMaps' : 'Alamat tidak tersedia')}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="bg-base-bg text-slate-600 px-2 py-0.5 rounded-lg text-xs font-medium">
@@ -295,136 +445,6 @@ export function IncomingOrders({ selectedAdminBranch, triggerNotification }: Pro
               );
             })}
           </div>
-
-          {/* Detail Panel */}
-          {selectedOrder && (
-            <div className={`rounded-2xl p-6 h-fit sticky top-4 transition-all ${
-              assignSuccess?.orderId === selectedOrder.id_order
-                ? 'bg-teal-50 border-2 border-teal-500'
-                : 'bg-white border border-deep-blue'
-            }`}>
-              {assignSuccess?.orderId === selectedOrder.id_order ? (
-                /* Success State */
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 bg-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-bold text-teal-700 mb-2">Berhasil!</h3>
-                  <p className="text-sm text-teal-600 mb-1">
-                    Pesanan <span className="font-mono font-semibold">{assignSuccess.orderId}</span>
-                  </p>
-                  <p className="text-sm text-teal-600">
-                    ditugaskan ke <span className="font-semibold">{assignSuccess.courierName}</span>
-                  </p>
-                </div>
-              ) : (
-                /* Normal State */
-                <>
-                  <h3 className="text-base font-bold text-navy mb-4">Detail Pesanan</h3>
-
-                  <div className="space-y-4">
-                    <div className="bg-base-bg rounded-2xl p-4">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">ID Pesanan</p>
-                      <p className="font-mono text-sm font-medium text-navy">{selectedOrder.id_order}</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pelanggan</p>
-                        <p className="text-sm font-medium text-navy">{selectedOrder.customer_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">WhatsApp</p>
-                        <p className="font-mono text-xs text-navy">{selectedOrder.customer_whatsapp}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Alamat Penjemputan</p>
-                      <p className="text-sm text-navy">{selectedOrder.alamat_penjemputan}</p>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Layanan</p>
-                        <p className="text-sm font-medium text-navy">{selectedOrder.service_type}</p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Berat</p>
-                        <p className="text-sm font-medium text-navy">{selectedOrder.berat_kg > 0 ? `${selectedOrder.berat_kg} kg` : '-'}</p>
-                      </div>
-                    </div>
-
-                    {/* Google Maps Navigation */}
-                    {selectedOrder.google_maps_url && (
-                      <a
-                        href={selectedOrder.google_maps_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 bg-deep-blue hover:bg-navy text-white rounded-2xl py-3 text-sm font-medium transition-all"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
-                        Buka Google Maps
-                      </a>
-                    )}
-
-                    {/* Courier Assignment */}
-                    {couriers.length > 0 && (
-                      <div className="pt-4 border-t border-slate-200">
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
-                          Tugaskan ke Kurir
-                        </label>
-                        <select
-                          value={selectedCourier}
-                          onChange={(e) => setSelectedCourier(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-deep-blue transition-all"
-                        >
-                          <option value="">Pilih kurir...</option>
-                          {couriers.map((c) => (
-                            <option key={c.id_kurir} value={c.id_kurir}>
-                              {c.nama_kurir}
-                            </option>
-                          ))}
-                        </select>
-
-                        <button
-                          onClick={() => handleAssignToCourier(selectedOrder)}
-                          disabled={!selectedCourier || assigning}
-                          className="w-full mt-3 bg-teal hover:bg-teal-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl py-3 text-sm font-medium transition-all flex items-center justify-center gap-2"
-                        >
-                          {assigning ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                              Memproses...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Konfirmasi & Tugaskan
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-
-                    {couriers.length === 0 && (
-                      <div className="pt-4 border-t border-slate-200">
-                        <p className="text-xs text-slate-400 text-center">
-                          Belum ada kurir terdaftar di cabang ini
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -59,13 +59,20 @@ export async function GET(request: Request) {
 
     // Calculate consolidated metrics
     let totalOmzet = 0;
+    let totalPemasukan = 0;
     let totalPengeluaran = 0;
     let totalPaguBudget = 0;
 
-    const branchData = branches.map((branch) => {
+    const perCabang = branches.map((branch) => {
       // Calculate omzet from orders
       const branchOmzet = branch.orders.reduce((sum, o) => sum + (o.total_harga || 0), 0);
       totalOmzet += branchOmzet;
+
+      // Calculate cashbook income (pemasukan)
+      const branchPemasukan = branch.cashbook_entries
+        .filter((e) => e.tipe === 'Pemasukan')
+        .reduce((sum, e) => sum + e.nominal, 0);
+      totalPemasukan += branchPemasukan;
 
       // Calculate expenses
       const branchPengeluaran = branch.expenses
@@ -78,6 +85,9 @@ export async function GET(request: Request) {
       const terpakai = budget?.terpakai || branchPengeluaran;
       const pagu = budget?.pagu_anggaran || 0;
       totalPaguBudget += pagu;
+
+      // Calculate saldo (profit)
+      const branchSaldo = branchPemasukan - branchPengeluaran;
 
       // Inventory status
       const inventoryStatus = branch.inventory_items.map((item) => {
@@ -99,41 +109,73 @@ export async function GET(request: Request) {
       const isOverBudget = terpakai > pagu;
       const isCloseBudget = utilizationPercent >= 90;
 
+      // Determine health status
+      let healthStatus: 'Healthy' | 'Warning' | 'Critical' = 'Healthy';
+      if (hasKritis || isOverBudget) healthStatus = 'Critical';
+      else if (hasMenipis || isCloseBudget) healthStatus = 'Warning';
+
       return {
         id_cabang: branch.id_cabang,
         nama_cabang: branch.nama_cabang,
         wilayah: branch.wilayah,
-        latitude: branch.latitude,
-        longitude: branch.longitude,
-        omzet: branchOmzet,
+        total_pemasukan: branchPemasukan || branchOmzet, // Fallback to omzet if no cashbook
         total_pengeluaran: branchPengeluaran,
+        omzet: branchOmzet,
+        saldo: branchSaldo,
         pagu_anggaran: pagu,
         terpakai,
+        sisa_pagu: Math.max(0, pagu - terpakai),
         utilization_percent: Math.round(utilizationPercent * 100) / 100,
+        health_status: healthStatus,
+        category_breakdown: {},
+        alerts: [],
+        transaction_count: branch.orders.length + branch.expenses.length,
+        map_coordinates: {
+          latitude: branch.latitude,
+          longitude: branch.longitude,
+          pin_color: hasKritis || isOverBudget ? 'red' : hasMenipis || isCloseBudget ? 'yellow' : 'green',
+        },
         inventory: {
           stocks: inventoryStatus,
+          overall_status: hasKritis ? 'Kritis' : hasMenipis ? 'Menipis' : 'Aman',
         },
-        map_status: hasKritis || isOverBudget ? 'Kritis' : hasMenipis || isCloseBudget ? 'Butuh Perhatian' : 'Aman',
+        in_transit: [],
+        replenishment: {
+          needs_replenishment: hasKritis,
+          items: inventoryStatus
+            .filter((s) => s.status === 'Kritis' || s.status === 'Menipis')
+            .map((s) => ({
+              item: s.item,
+              satuan: 'PCS',
+              stok_saat_ini: s.stok_saat_ini,
+              max_capacity: s.max_capacity,
+              safety_threshold: s.safety_threshold,
+              kebutuhan: s.max_capacity - s.stok_saat_ini,
+              is_below_threshold: s.status === 'Kritis' || s.status === 'Menipis',
+            })),
+        },
       };
     });
 
-    const totalProfit = totalOmzet - totalPengeluaran;
+    const totalProfit = totalPemasukan - totalPengeluaran;
     const profitEfficiency = totalOmzet > 0 ? (totalProfit / totalOmzet) * 100 : 0;
+    const branchesNeedingAttention = perCabang.filter(
+      (b) => b.health_status === 'Critical' || b.health_status === 'Warning'
+    ).length;
 
     return jsonResponse({
       success: true,
-      data: {
-        summary: {
-          total_omzet: totalOmzet,
-          total_pengeluaran: totalPengeluaran,
-          total_profit: totalProfit,
-          profit_efficiency: Math.round(profitEfficiency * 100) / 100,
-          total_budget_pagu: totalPaguBudget,
-        },
-        branches: branchData,
-        total_branches: branches.length,
-        generated_at: new Date().toISOString(),
+      summary: {
+        total_pemasukan: totalPemasukan,
+        total_pengeluaran: totalPengeluaran,
+        total_saldo: totalProfit,
+        total_omzet: totalOmzet,
+        total_cabang: branches.length,
+        active_branches: branches.filter((b) => b.is_active).length,
+        branches_needing_attention: branchesNeedingAttention,
       },
+      per_cabang: perCabang,
+      generated_at: new Date().toISOString(),
     });
   } catch (error) {
     console.error('[Owner Dashboard] Error:', error);

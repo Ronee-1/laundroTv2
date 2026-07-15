@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -111,6 +110,7 @@ model Order {
   source                 String?
   assigned_by            String?
   assigned_at            DateTime?
+  metode_pembayaran      String?   @default("Tunai")
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
   branch                 Branch    @relation(fields: [id_cabang], references: [id_cabang])
@@ -121,6 +121,7 @@ model Order {
   @@index([status])
   @@index([source])
   @@index([tanggal_order])
+  @@index([metode_pembayaran])
 }
 
 model Expense {
