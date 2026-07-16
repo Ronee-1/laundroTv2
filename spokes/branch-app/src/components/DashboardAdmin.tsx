@@ -7,14 +7,49 @@
 // FR-012: Separate budget warning banners
 // Peringatan 24 jam: Banner jika data stok belum diperbarui
 //
-// NOTE: Data inventory di bawah ini HARUS SAMA dengan data di
-// hub/src/services/inventory.ts - INVENTORY array
-// Pastikan kedua file sinkron saat update data stok
+// NOTE: Data diambil dari database secara REAL-TIME untuk semua cabang
+// Tidak ada hardcoded data untuk card pendapatan
 // ==========================================
 
 import { useState, useEffect, useRef } from 'react';
 import type { UserRole } from '../App.tsx';
 import { RestockModal } from './RestockModal.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
+
+// Branch info interface (from database)
+interface BranchInfo {
+  id_cabang: string;
+  nama_cabang: string;
+  alamat: string;
+  latitude: number;
+  longitude: number;
+  wilayah: string;
+  is_active: boolean;
+  kuota_harian: number;
+  kuota_terpakai: number;
+  omzet: number;
+}
+
+// Branch budget data from database
+interface BranchBudget {
+  pagu_anggaran: number;
+  terpakai: number;
+  sisa_pagu: number;
+  utilization_percent: number;
+  daily_average: number;
+}
+
+// Revenue data from API
+interface RevenueData {
+  total_hari_ini: number;
+  total_bulan_ini: number;
+  jumlah_order_hari_ini: number;
+  jumlah_order_bulan_ini: number;
+  tunai_hari_ini: number;
+  non_tunai_hari_ini: number;
+  month_cash?: number;
+  month_non_cash?: number;
+}
 
 interface StockItem {
   item: string;
@@ -87,108 +122,11 @@ function formatIDR(num: number): string {
   }).format(num);
 }
 
-const MOCK_BRANCH_DATA_MAP: Record<string, BranchData> = {
-  'CBG-001': {
-    id_cabang: 'CBG-001',
-    nama_cabang: 'Depok (Pusat)',
-    budget: {
-      pagu_anggaran: 5000000,
-      terpakai: 350000,
-      sisa_pagu: 4650000,
-      utilization_percent: 7,
-      daily_average: 50000,
-    },
-    inventory: {
-      stocks: [
-        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 45, safety_threshold: 50, max_capacity: 100, status: 'Menipis' },
-        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 30, safety_threshold: 50, max_capacity: 80, status: 'Menipis' },
-        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 120, safety_threshold: 100, max_capacity: 200, status: 'Aman' },
-      ],
-      overall_status: 'Menipis',
-      last_updated: new Date().toISOString(),
-    },
-  },
-  'CBG-002': {
-    id_cabang: 'CBG-002',
-    nama_cabang: 'Jakarta Selatan',
-    budget: {
-      pagu_anggaran: 5000000,
-      terpakai: 2300000,
-      sisa_pagu: 2700000,
-      utilization_percent: 46,
-      daily_average: 328571,
-    },
-    inventory: {
-      stocks: [
-        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 12, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
-        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 25, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
-        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 18, safety_threshold: 100, max_capacity: 200, status: 'Kritis' },
-      ],
-      overall_status: 'Kritis',
-      last_updated: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  'CBG-003': {
-    id_cabang: 'CBG-003',
-    nama_cabang: 'Bekasi Timur',
-    budget: {
-      pagu_anggaran: 4000000,
-      terpakai: 1200000,
-      sisa_pagu: 2800000,
-      utilization_percent: 30,
-      daily_average: 171429,
-    },
-    inventory: {
-      stocks: [
-        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 22, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
-        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 14, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
-        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 85, safety_threshold: 100, max_capacity: 200, status: 'Kritis' },
-      ],
-      overall_status: 'Kritis',
-      last_updated: new Date().toISOString(),
-    },
-  },
-  'CBG-004': {
-    id_cabang: 'CBG-004',
-    nama_cabang: 'Tangerang Kota',
-    budget: {
-      pagu_anggaran: 4500000,
-      terpakai: 2800000,
-      sisa_pagu: 1700000,
-      utilization_percent: 62,
-      daily_average: 400000,
-    },
-    inventory: {
-      stocks: [
-        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 40, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
-        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 35, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
-        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 110, safety_threshold: 100, max_capacity: 200, status: 'Aman' },
-      ],
-      overall_status: 'Kritis',
-      last_updated: new Date().toISOString(),
-    },
-  },
-  'CBG-005': {
-    id_cabang: 'CBG-005',
-    nama_cabang: 'Bogor Raya',
-    budget: {
-      pagu_anggaran: 4000000,
-      terpakai: 3850000,
-      sisa_pagu: 150000,
-      utilization_percent: 96,
-      daily_average: 550000,
-    },
-    inventory: {
-      stocks: [
-        { item: 'Detergen Cair', satuan: 'PCS', stok_saat_ini: 8, safety_threshold: 50, max_capacity: 100, status: 'Kritis' },
-        { item: 'Pelembut', satuan: 'PCS', stok_saat_ini: 9, safety_threshold: 50, max_capacity: 80, status: 'Kritis' },
-        { item: 'Plastik Packing', satuan: 'PCS', stok_saat_ini: 45, safety_threshold: 100, max_capacity: 200, status: 'Kritis' },
-      ],
-      overall_status: 'Kritis',
-      last_updated: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-};
+// ==========================================
+// NO HARDCODED DATA - Semua data diambil dari database secara REAL-TIME
+// Revenue data diambil dari /api/branches/:id/daily-summary
+// Budget data diambil dari /api/branches/:id/budget
+// ==========================================
 
 function getStockStatusStyle(status: string) {
   if (status === 'Kritis') {
@@ -806,13 +744,40 @@ function CourierDetailModal({ courier, branchId: _branchId, onClose, onAssignNew
 }
 
 export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotification }: Props) {
+  const { getToken } = useAuth();
+
+  // Fetch real branch info from API
+  const [branchInfo, setBranchInfo] = useState<BranchInfo | null>(null);
+  const [loadingBranch, setLoadingBranch] = useState(true);
+
   // Fetch real inventory from API
   const [inventoryState, setInventoryState] = useState<StockItem[] | null>(null);
-  const [_loadingInventory, setLoadingInventory] = useState(true);
+  const [loadingInventory, setLoadingInventory] = useState(true);
 
   // Fetch real courier data from API
   const [couriersState, setCouriersState] = useState<Courier[]>([]);
   const [loadingCouriers, setLoadingCouriers] = useState(true);
+
+  // Fetch revenue from orders - REAL-TIME per branch
+  const [revenueData, setRevenueData] = useState<RevenueData>({
+    total_hari_ini: 0,
+    total_bulan_ini: 0,
+    jumlah_order_hari_ini: 0,
+    jumlah_order_bulan_ini: 0,
+    tunai_hari_ini: 0,
+    non_tunai_hari_ini: 0,
+  });
+  const [loadingRevenue, setLoadingRevenue] = useState(true);
+
+  // Fetch budget from API - REAL-TIME per branch
+  const [budgetData, setBudgetData] = useState<BranchBudget>({
+    pagu_anggaran: 0,
+    terpakai: 0,
+    sisa_pagu: 0,
+    utilization_percent: 0,
+    daily_average: 0,
+  });
+  const [loadingBudget, setLoadingBudget] = useState(true);
 
   // Modal states for courier actions
   const [assignCourierModal, setAssignCourierModal] = useState<Courier | null>(null);
@@ -847,7 +812,11 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
   // Refresh couriers after action
   const refreshCouriers = async () => {
     try {
-      const res = await fetch(`/api/couriers/branch/${selectedAdminBranch}`);
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/couriers/branch/${selectedAdminBranch}`, { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.couriers) {
@@ -857,11 +826,43 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
     } catch { /* ignore */ }
   };
 
+  // ==========================================
+  // FETCH BRANCH INFO - Get branch details from database
+  // ==========================================
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBranchInfo() {
+      try {
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/branches/${selectedAdminBranch}`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data?.branch) {
+            if (!cancelled) setBranchInfo(json.data.branch);
+          }
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setLoadingBranch(false);
+    }
+    fetchBranchInfo();
+    return () => { cancelled = true; };
+  }, [selectedAdminBranch, getToken]);
+
+  // ==========================================
+  // FETCH INVENTORY - Real inventory data from database
+  // ==========================================
   useEffect(() => {
     let cancelled = false;
     async function fetchInventory() {
       try {
-        const res = await fetch(`/api/branches/${selectedAdminBranch}/inventory`);
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/branches/${selectedAdminBranch}/inventory`, { headers });
         if (res.ok) {
           const json = await res.json();
           if (json.success) {
@@ -874,14 +875,20 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
     fetchInventory();
     const interval = setInterval(fetchInventory, 30000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [selectedAdminBranch]);
+  }, [selectedAdminBranch, getToken]);
 
-  // Fetch couriers from API
+  // ==========================================
+  // FETCH COURIERS - Real courier data from database
+  // ==========================================
   useEffect(() => {
     let cancelled = false;
     async function fetchCouriers() {
       try {
-        const res = await fetch(`/api/couriers/branch/${selectedAdminBranch}`);
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/couriers/branch/${selectedAdminBranch}`, { headers });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.couriers) {
@@ -894,7 +901,84 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
     fetchCouriers();
     const interval = setInterval(fetchCouriers, 30000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [selectedAdminBranch]);
+  }, [selectedAdminBranch, getToken]);
+
+  // ==========================================
+  // FETCH REVENUE - REAL-TIME revenue data dari daily-summary API
+  // Data diambil berdasarkan selectedAdminBranch
+  // ==========================================
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchRevenue() {
+      try {
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/branches/${selectedAdminBranch}/daily-summary`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) {
+            if (!cancelled) {
+              setRevenueData({
+                // Total = Tunai (cashbook) + Non-Tunai (orders)
+                total_hari_ini: (json.today_cash || 0) + (json.today_non_cash || 0),
+                total_bulan_ini: (json.month_cash || 0) + (json.month_non_cash || 0),
+                jumlah_order_hari_ini: json.today_orders || 0,
+                jumlah_order_bulan_ini: json.month_orders || 0,
+                // Tunai dari cashbook (Audit Kas)
+                tunai_hari_ini: json.today_cash || 0,
+                // Non-Tunai dari orders
+                non_tunai_hari_ini: json.today_non_cash || 0,
+                month_cash: json.month_cash || 0,
+                month_non_cash: json.month_non_cash || 0,
+              });
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setLoadingRevenue(false);
+    }
+    fetchRevenue();
+    // Refresh setiap 30 detik untuk data real-time
+    const interval = setInterval(fetchRevenue, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [selectedAdminBranch, getToken]);
+
+  // ==========================================
+  // FETCH BUDGET - Real budget data dari monthly_budgets table
+  // ==========================================
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBudget() {
+      try {
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const now = new Date();
+        const bulan = now.toLocaleString('id-ID', { month: 'short' }).toUpperCase();
+        const tahun = now.getFullYear();
+
+        const res = await fetch(`/api/branches/${selectedAdminBranch}/budget?bulan=${bulan}&tahun=${tahun}`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data?.budget) {
+            if (!cancelled) setBudgetData(json.data.budget);
+          }
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setLoadingBudget(false);
+    }
+    fetchBudget();
+    const interval = setInterval(fetchBudget, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [selectedAdminBranch, getToken]);
+
+  // ==========================================
+  // DYNAMIC BRANCH DATA - Tidak ada data hardcoded
+  // Semua data diambil dari API berdasarkan selectedAdminBranch
+  // ==========================================
 
   // Use real inventory from API
   const inventoryStocks: StockItem[] = inventoryState ? inventoryState.map((s) => ({
@@ -908,17 +992,12 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
 
   const overallInventoryStatus = inventoryStocks.some(s => s.status === 'Kritis') ? 'Kritis' : inventoryStocks.some(s => s.status === 'Menipis') ? 'Menipis' : 'Aman';
 
-  // Branch data with real inventory
-  const defaultBranch = MOCK_BRANCH_DATA_MAP['CBG-002']!;
-  const selectedBranch = MOCK_BRANCH_DATA_MAP[selectedAdminBranch] ?? defaultBranch;
-  const branchData = {
-    ...selectedBranch,
-    inventory: {
-      stocks: inventoryStocks.length > 0 ? inventoryStocks : selectedBranch?.inventory.stocks ?? [],
-      overall_status: overallInventoryStatus,
-      last_updated: new Date().toISOString()
-    }
-  };
+  // Dynamic branch name from API or fallback to branch selector value
+  const branchName = branchInfo?.nama_cabang || selectedAdminBranch;
+
+  // Calculate budget status from dynamic budget data
+  const isBudgetExceeded = budgetData.sisa_pagu <= 0;
+  const isBudgetWarning = budgetData.utilization_percent >= 90 && budgetData.sisa_pagu > 0;
 
   // Use couriers from API state
   const couriers = couriersState;
@@ -927,12 +1006,11 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
   // Calculate active and idle couriers based on real status
   const activeCouriers = couriers.filter(c => c.status === 'Busy' || c.status === 'Available').length;
   const idleCouriers = couriers.filter(c => c.status === 'Offline' || !c.is_available).length;
-  const criticalStockCount = branchData.inventory.stocks.filter(s => s.status === 'Kritis').length;
+  const criticalStockCount = inventoryStocks.filter(s => s.status === 'Kritis').length;
 
-  const lastUpdated = branchData.inventory.last_updated ? new Date(branchData.inventory.last_updated) : null;
+  // Inventory last updated timestamp
+  const lastUpdated = inventoryState && inventoryState.length > 0 ? new Date() : null;
   const showInactivityWarning = lastUpdated ? (Date.now() - lastUpdated.getTime()) >= 24 * 60 * 60 * 1000 : false;
-  const isBudgetExceeded = branchData.budget.sisa_pagu <= 0;
-  const isBudgetWarning = branchData.budget.utilization_percent >= 90 && branchData.budget.sisa_pagu > 0;
 
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: '#f8f9ff' }}>
@@ -953,7 +1031,7 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
         <svg className="w-5 h-5 flex-shrink-0" style={{ color: '#d97706' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77 1.333-2.694 1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         <div>
           <p className="text-sm font-semibold" style={{ color: '#92400e' }}>⚠️ Peringatan Anggaran Mendekati Batas</p>
-          <p className="text-xs" style={{ color: '#a16207' }}>Anggaran operasional telah terpakai {branchData.budget.utilization_percent}%. Sisa: {formatIDR(branchData.budget.sisa_pagu)}.</p>
+          <p className="text-xs" style={{ color: '#a16207' }}>Anggaran operasional telah terpakai {budgetData.utilization_percent}%. Sisa: {formatIDR(budgetData.sisa_pagu)}.</p>
         </div>
       </div>
       )}
@@ -984,7 +1062,7 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold" style={{ color: '#15157d' }}>Branch Overview</h1>
-          <p className="text-base" style={{ color: '#464652' }}>Real-time status of {branchData.nama_cabang} Branch operations.</p>
+          <p className="text-base" style={{ color: '#464652' }}>Real-time status of {branchName} ({selectedAdminBranch}) operations.</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold shadow-md hover:opacity-90 active:scale-95 transition-all" style={{ backgroundColor: '#0056c6', color: 'white' }}>
@@ -996,72 +1074,100 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
 
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* 1. Budget Monitor Card */}
+        {/* 1. Pendapatan Card - REPLACED Budget Control */}
         <div className="md:col-span-4 rounded-xl p-6 flex flex-col justify-between overflow-hidden" style={{ backgroundColor: 'white', border: '1px solid #c7c5d4' }}>
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h3 className="text-xl font-semibold" style={{ color: '#0b1c30' }}>Kontrol Anggaran</h3>
-              <p className="text-xs" style={{ color: '#464652' }}>Batas Operasional Bulanan</p>
+              <h3 className="text-xl font-semibold" style={{ color: '#0b1c30' }}>Pendapatan</h3>
+              <p className="text-xs" style={{ color: '#464652' }}>Ringkasan Pendapatan</p>
             </div>
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#e5eeff' }}>
-              <svg className="w-5 h-5" style={{ color: '#0056c6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 2h1m-5 6h1m-4-8h1m-4 4H8m4 4h1m-5 6h1m-4-8h1" /></svg>
-            </div>
-          </div>
-          <div className="mb-4">
-            <div className="flex justify-between items-end mb-1">
-              <span className="text-5xl font-bold" style={{ color: '#15157d' }}>{branchData.budget.utilization_percent}%</span>
-              <span className="text-sm" style={{ color: '#464652' }}>{formatIDR(branchData.budget.terpakai)} / {formatIDR(branchData.budget.pagu_anggaran)}</span>
-            </div>
-            <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: '#e5eeff' }}>
-              <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${branchData.budget.utilization_percent}%`, backgroundColor: isBudgetExceeded ? '#ba1a1a' : isBudgetWarning ? '#d97706' : '#0056c6' }}></div>
+            <div className="p-2 rounded-lg" style={{ backgroundColor: '#d1fae5' }}>
+              <svg className="w-5 h-5" style={{ color: '#059669' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#eff4ff' }}>
-              <p className="text-xs" style={{ color: '#464652' }}>Rata-rata Harian</p>
-              <p className="text-xl font-semibold" style={{ color: '#0b1c30' }}>{formatIDR(branchData.budget.daily_average)}</p>
+          {loadingRevenue ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-slate-200 border-t-[#059669] rounded-full animate-spin"></div>
             </div>
-            <div className="p-2 rounded-lg" style={{ backgroundColor: isBudgetExceeded ? '#ffdad6' : '#eff4ff' }}>
-              <p className="text-xs" style={{ color: isBudgetExceeded ? '#ba1a1a' : '#464652' }}>Sisa Anggaran</p>
-              <p className="text-xl font-semibold" style={{ color: isBudgetExceeded ? '#ba1a1a' : isBudgetWarning ? '#d97706' : '#0056c6' }}>{formatIDR(branchData.budget.sisa_pagu)}</p>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <p className="text-xs" style={{ color: '#464652' }}>Total Hari Ini</p>
+                <p className="text-4xl font-bold" style={{ color: '#059669' }}>{formatIDR(revenueData.total_hari_ini)}</p>
+                <p className="text-xs" style={{ color: '#6b7280' }}>{revenueData.jumlah_order_hari_ini} order</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: '#fef3c7' }}>
+                  <p className="text-xs" style={{ color: '#92400e' }}>💵 Tunai</p>
+                  <p className="text-lg font-semibold" style={{ color: '#78350f' }}>{formatIDR(revenueData.tunai_hari_ini)}</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ backgroundColor: '#ede9fe' }}>
+                  <p className="text-xs" style={{ color: '#6b21a8' }}>💳 Non-Tunai</p>
+                  <p className="text-lg font-semibold" style={{ color: '#7c3aed' }}>{formatIDR(revenueData.non_tunai_hari_ini)}</p>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: '#e5e7eb' }}>
+                <div className="flex justify-between items-center">
+                  <p className="text-xs" style={{ color: '#6b7280' }}>Bulan Ini</p>
+                  <p className="text-sm font-semibold" style={{ color: '#059669' }}>{formatIDR(revenueData.total_bulan_ini)}</p>
+                </div>
+                <p className="text-xs" style={{ color: '#9ca3af' }}>{revenueData.jumlah_order_bulan_ini} order</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 2. Inventory Matrix Card */}
         <div className="md:col-span-8 rounded-xl p-6" style={{ backgroundColor: 'white', border: '1px solid #c7c5d4' }}>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold" style={{ color: '#0b1c30' }}>Inventory Matrix</h3>
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              overallInventoryStatus === 'Kritis' ? 'bg-red-100 text-red-700' :
+              overallInventoryStatus === 'Menipis' ? 'bg-amber-100 text-amber-700' :
+              'bg-green-100 text-green-700'
+            }`}>
+              {overallInventoryStatus}
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {branchData.inventory.stocks.map((stock: StockItem) => {
-              const style = getStockStatusStyle(stock.status);
-              const percent = Math.round((stock.stok_saat_ini / stock.max_capacity) * 100);
-              const belowPercent = stock.safety_threshold > 0 ? Math.round(((stock.safety_threshold - stock.stok_saat_ini) / stock.safety_threshold) * 100) : 0;
-              return (
-                <div key={stock.item} className={`p-4 rounded-xl border transition-colors ${style.container}`} style={{ backgroundColor: stock.status === 'Kritis' ? 'rgba(255, 218, 214, 0.2)' : 'white' }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${style.icon}`}>
-                      {stock.item === 'Detergen Cair' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-1.172a2 2 0 01-1.414-.586l-.828-.828A2 2 0 0016.172 8H8a2 2 0 00-2 2v4a2 2 0 002 2h1z" /></svg>}
-                      {stock.item === 'Pelembut' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>}
-                      {stock.item === 'Plastik Packing' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" /></svg>}
+          {loadingInventory ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-slate-200 border-t-[#0056c6] rounded-full animate-spin"></div>
+            </div>
+          ) : inventoryStocks.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <p>Tidak ada data inventaris</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {inventoryStocks.map((stock: StockItem) => {
+                const style = getStockStatusStyle(stock.status);
+                const percent = Math.round((stock.stok_saat_ini / stock.max_capacity) * 100);
+                const belowPercent = stock.safety_threshold > 0 ? Math.round(((stock.safety_threshold - stock.stok_saat_ini) / stock.safety_threshold) * 100) : 0;
+                return (
+                  <div key={stock.item} className={`p-4 rounded-xl border transition-colors ${style.container}`} style={{ backgroundColor: stock.status === 'Kritis' ? 'rgba(255, 218, 214, 0.2)' : 'white' }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${style.icon}`}>
+                        {stock.item === 'Detergen Cair' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-1.172a2 2 0 01-1.414-.586l-.828-.828A2 2 0 0016.172 8H8a2 2 0 00-2 2v4a2 2 0 002 2h1z" /></svg>}
+                        {stock.item === 'Pelembut' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>}
+                        {stock.item === 'Plastik Packing' && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0" /></svg>}
+                      </div>
+                      <span className="text-sm font-semibold">{stock.item}</span>
                     </div>
-                    <span className="text-sm font-semibold">{stock.item}</span>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <span className="text-3xl font-bold" style={{ color: stock.status === 'Kritis' ? '#ba1a1a' : '#0b1c30' }}>{stock.stok_saat_ini} <small className="text-base font-normal" style={{ color: '#464652' }}>{stock.satuan}</small></span>
-                    <div className="flex flex-col items-end">
-                      <span className="text-xs" style={{ color: '#464652' }}>Safety: {stock.safety_threshold}{stock.satuan}</span>
-                      {stock.status === 'Kritis' ? <span className="text-xs font-bold" style={{ color: '#ba1a1a' }}>{belowPercent}% Below</span> : <span className="text-xs font-bold" style={{ color: '#0056c6' }}>Optimal</span>}
+                    <div className="flex justify-between items-end">
+                      <span className="text-3xl font-bold" style={{ color: stock.status === 'Kritis' ? '#ba1a1a' : '#0b1c30' }}>{stock.stok_saat_ini} <small className="text-base font-normal" style={{ color: '#464652' }}>{stock.satuan}</small></span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-xs" style={{ color: '#464652' }}>Safety: {stock.safety_threshold}{stock.satuan}</span>
+                        {stock.status === 'Kritis' ? <span className="text-xs font-bold" style={{ color: '#ba1a1a' }}>{belowPercent}% Below</span> : <span className="text-xs font-bold" style={{ color: '#0056c6' }}>Optimal</span>}
+                      </div>
+                    </div>
+                    <div className="mt-3 w-full h-1 rounded-full" style={{ backgroundColor: '#e5eeff' }}>
+                      <div className={`h-full rounded-full transition-all ${stock.status === 'Kritis' ? 'animate-pulse' : ''}`} style={{ width: `${percent}%`, backgroundColor: stock.status === 'Kritis' ? '#ba1a1a' : '#0056c6' }}></div>
                     </div>
                   </div>
-                  <div className="mt-3 w-full h-1 rounded-full" style={{ backgroundColor: '#e5eeff' }}>
-                    <div className={`h-full rounded-full ${stock.status === 'Kritis' ? 'animate-pulse' : ''}`} style={{ width: `${percent}%`, backgroundColor: stock.status === 'Kritis' ? '#ba1a1a' : '#0056c6' }}></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 3. Courier Allocation Card - Full Width */}
@@ -1139,8 +1245,8 @@ export function DashboardAdmin({ userRole, selectedAdminBranch, triggerNotificat
 
       {showRestockModal && (
         <RestockModal
-          branches={[{ id: branchData.id_cabang ?? selectedAdminBranch, nama: branchData.nama_cabang ?? selectedAdminBranch }]}
-          initialBranchId={branchData.id_cabang ?? selectedAdminBranch}
+          branches={[{ id: selectedAdminBranch, nama: branchName || selectedAdminBranch }]}
+          initialBranchId={selectedAdminBranch}
           userRole={userRole}
           selectedAdminBranch={selectedAdminBranch}
           onClose={() => setShowRestockModal(false)}

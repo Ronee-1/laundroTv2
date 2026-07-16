@@ -578,6 +578,59 @@ model Order {
 
 ---
 
+### FR-016: Dashboard Admin - Pendapatan & Metode Pembayaran
+| Atribut | Detail |
+|---------|--------|
+| **ID** | FR-ADMIN-016 |
+| **Trigger** | Admin Branch mengakses Dashboard Admin |
+| **Aktor** | Admin Branch |
+| **Deskripsi** | Dashboard Admin menampilkan ringkasan pendapatan harian dari layanan yang digunakan pelanggan, dengan breakdown Tunai dan Non-Tunai. Card "Kontrol Anggaran" digantikan dengan card "Pendapatan" |
+
+**Implementasi:**
+- `spokes/branch-app/src/components/DashboardAdmin.tsx`
+- `api/branches/[id]/daily-summary.ts`
+
+**Card "Pendapatan" Features:**
+| Metric | Deskripsi |
+|--------|-----------|
+| Total Hari Ini | Total pendapatan dari semua order hari ini |
+| 💵 Tunai | Pendapatan metode pembayaran Tunai |
+| 💳 Non-Tunai | Pendapatan metode pembayaran Non-Tunai |
+| Bulan Ini | Total pendapatan bulan berjalan |
+
+**API Response:**
+```typescript
+{
+  success: true,
+  today_revenue: number,      // Total revenue hari ini
+  month_revenue: number,      // Total revenue bulan ini
+  today_orders: number,        // Jumlah order hari ini
+  month_orders: number,        // Jumlah order bulan ini
+  today_cash: number,          // Revenue Tunai hari ini
+  today_non_cash: number,      // Revenue Non-Tunai hari ini
+}
+```
+
+**UI Card Layout:**
+```
+┌────────────────────────────────────────┐
+│ Pendapatan          [💰 Icon]          │
+│ Ringkasan Pendapatan                     │
+├────────────────────────────────────────┤
+│ Total Hari Ini                          │
+│ Rp 1.250.000                           │
+│ 15 order                               │
+├──────────────────┬─────────────────────┤
+│ 💵 Tunai          │ 💳 Non-Tunai       │
+│ Rp 850.000        │ Rp 400.000          │
+├──────────────────┴─────────────────────┤
+│ Bulan Ini            Rp 15.750.000      │
+│                     125 order           │
+└────────────────────────────────────────┘
+```
+
+---
+
 ## Appendix: Endpoint Summary
 
 | Method | Endpoint | FR Coverage |
@@ -589,6 +642,7 @@ model Order {
 | POST | `/api/expenses/request` | FR-012 |
 | POST | `/api/branches/:id_cabang/reconcile` | FR-013 |
 | GET | `/api/branches/reconcile/all` | FR-013 |
+| GET | `/api/branches/:id/daily-summary` | FR-016 |
 | GET | `/api/logistics/active` | FR-KUR-001 |
 | POST | `/api/logistics/:id/start-route` | FR-KUR-003 |
 | POST | `/api/logistics/:id/handover` | FR-KUR-003 |
@@ -601,3 +655,4 @@ model Order {
 |---------|------|--------|---------|
 | 1.0 | 2026-07-06 | System | Initial FR alignment with codebase |
 | 1.1 | 2026-07-15 | System | Added FR-015: Pilihan Metode Pembayaran Tunai / Non-Tunai |
+| 1.2 | 2026-07-15 | System | Added FR-016: Dashboard Admin - Card Pendapatan dengan breakdown Tunai/Non-Tunai |

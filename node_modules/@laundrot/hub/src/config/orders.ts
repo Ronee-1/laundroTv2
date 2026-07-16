@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import type { Order, OrderStatus } from '@laundrot/shared-types';
-import type { Order as PrismaOrder } from '../generated/prisma/client.js';
+import type { Order as PrismaOrder } from '@prisma/client';
 
 // ==========================================
 // ORDERS CONFIG - FR-LOG-01, FR-LOG-02, FR-005 Integration

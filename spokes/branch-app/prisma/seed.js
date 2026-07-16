@@ -1,12 +1,19 @@
 /**
  * Seed Script for LaundroT Database
  * Run with: npm run seed
+ * Updated for Prisma 7
  */
 
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+// Create Prisma client with pg adapter
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:51582/laundrot';
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const BCRYPT_SALT = 12;
 
@@ -146,4 +153,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

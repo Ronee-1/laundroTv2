@@ -36,6 +36,7 @@ export interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   getToken: () => string | null;
+  refreshUser: () => Promise<void>; // Refresh user data to get latest courier_id
 }
 
 // ============================================================
@@ -66,6 +67,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const userStr = localStorage.getItem(USER_KEY);
     const user = userStr ? (JSON.parse(userStr) as User) : null;
 
+    // DEBUG: Log restored user
+    if (user) {
+      console.log('[AuthContext] Restored user from localStorage:', {
+        id_user: user.id_user,
+        nama: user.nama,
+        role: user.role,
+        id_cabang: user.id_cabang,
+        courier_id: user.courier_id,
+      });
+    }
+
     return {
       isAuthenticated: !!token && !!user,
       user,
@@ -73,6 +85,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isLoading: false,
     };
   });
+
+  /**
+   * Refresh user data - fetches latest courier_id from backend
+   * Call this after login to ensure courier_id is correctly set
+   */
+  const refreshUser = useCallback(async () => {
+    const token = state.token || localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (data.success && data.user) {
+        // Update localStorage with fresh data
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        setState((prev) => ({
+          ...prev,
+          user: data.user,
+        }));
+        console.log('[AuthContext] User refreshed:', {
+          courier_id: data.user.courier_id,
+        });
+      }
+    } catch (err) {
+      console.error('[AuthContext] Failed to refresh user:', err);
+    }
+  }, [state.token]);
 
   /**
    * Login function - calls backend API
@@ -99,6 +141,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Store token and user data
       const { token, user } = data.data;
+
+      // DEBUG: Log login response
+      console.log('[AuthContext] Login response:', {
+        id_user: user.id_user,
+        nama: user.nama,
+        role: user.role,
+        id_cabang: user.id_cabang,
+        courier_id: user.courier_id,
+      });
+
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
 
@@ -109,6 +161,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading: false,
       });
 
+      // If Kurir but courier_id is null, try to refresh
+      if (user.role === 'Kurir' && !user.courier_id) {
+        console.log('[AuthContext] Kurir without courier_id, refreshing...');
+        await refreshUser();
+      }
+
       return { success: true };
     } catch (error) {
       console.error('[Auth] Login error:', error);
@@ -116,7 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setState((prev) => ({ ...prev, isLoading: false }));
     }
-  }, []);
+  }, [refreshUser]);
 
   /**
    * Logout function - clears token and user data
@@ -145,6 +203,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     getToken,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

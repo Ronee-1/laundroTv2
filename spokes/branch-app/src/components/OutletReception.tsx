@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { UserRole } from '../App.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 
 // Payment method types
 export type PaymentMethod = 'Tunai' | 'Non-Tunai';
@@ -59,6 +60,7 @@ const MOCK_SERVICES: ServiceTariff[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function OutletReception({ selectedAdminBranch, userRole: _userRole, triggerNotification }: Props) {
+  const { getToken } = useAuth();
   const [services, setServices] = useState<ServiceTariff[]>(MOCK_SERVICES);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -86,7 +88,11 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
   useEffect(() => {
     async function fetchServices() {
       try {
-        const res = await fetch('/api/services/tariffs');
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/services/tariffs', { headers });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.services) {
@@ -98,13 +104,17 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
       }
     }
     fetchServices();
-  }, []);
+  }, [getToken]);
 
   // Fetch customers from API when branch changes
   useEffect(() => {
     async function fetchCustomers() {
       try {
-        const res = await fetch(`/api/branches/${selectedAdminBranch}/customers`);
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/branches/${selectedAdminBranch}/customers`, { headers });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.customers) {
@@ -116,7 +126,7 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
       }
     }
     fetchCustomers();
-  }, [selectedAdminBranch]);
+  }, [selectedAdminBranch, getToken]);
 
   // Reset quantity when service changes
   useEffect(() => {
@@ -152,9 +162,15 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
 
     setSubmitting(true);
     try {
+      const token = getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`/api/branches/${selectedAdminBranch}/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           id_pelanggan: selectedCustomer.trim(),
           customer_name: customer?.nama?.trim() ?? 'Unknown',
@@ -165,7 +181,7 @@ export function OutletReception({ selectedAdminBranch, userRole: _userRole, trig
           satuan: selectedSvc.satuan,
           berat_kg: selectedSvc.satuan === 'kg' ? qty : 0,
           total_harga: totalHarga,
-          status: 'Diproses',
+          status: 'Pending',
           metode_pembayaran: paymentMethod,
         }),
       });

@@ -112,9 +112,9 @@ export function AuditRekonsiliasi({ userRole, selectedAdminBranch, triggerNotifi
       if (res.ok) {
         const json = await res.json();
         setFinancialSummary({
-          totalPemasukanHariIni: json.total_pemasukan ?? 0,
-          totalPengeluaranHariIni: json.total_pengeluaran ?? 0,
-          sisaKasAkhirLaci: json.sisa_kas ?? 0,
+          totalPemasukanHariIni: json.data?.cashbook?.total_pemasukan ?? json.today_cash ?? 0,
+          totalPengeluaranHariIni: json.data?.cashbook?.total_pengeluaran ?? 0,
+          sisaKasAkhirLaci: json.data?.cashbook?.saldo ?? json.cashbook_balance ?? 0,
         });
       } else {
         // Mock data if endpoint not available

@@ -12,64 +12,17 @@ datasource db {
 }
 
 // ============================================================
-// ENUM DEFINITIONS
+// TYPE DEFINITIONS (using String instead of enums)
 // ============================================================
 
-enum UserRole {
-  Owner
-  Admin
-  Kurir
-}
-
-enum OrderStatus {
-  Pending
-  Dialokasikan
-  OnRoute
-  PickingUp
-  Delivering
-  Selesai
-  Done
-  Lunas
-  Dibatalkan
-  Canceled
-}
-
-enum CourierStatus {
-  Available
-  OnDuty
-  OffDuty
-}
-
-enum ExpenseStatus {
-  Pending
-  Approve
-  Reject
-}
-
-enum ReconciliationStatus {
-  Cocok
-  Selisih
-}
-
-enum ApprovalStatus {
-  Pending
-  Disetujui
-  Ditolak
-}
-
-enum RestockStatus {
-  Pending
-  Approved
-  Rejected
-}
-
-enum LogisticsStatus {
-  InTransit
-  DriverEnRoute
-  AwaitingVerification
-  Completed
-  CompletedDiscrepancy
-}
+// UserRole: 'Owner' | 'Admin' | 'Kurir'
+// OrderStatus: 'Pending' | 'Dialokasikan' | 'OnRoute' | 'PickingUp' | 'Delivering' | 'Selesai' | 'Done' | 'Lunas' | 'Dibatalkan' | 'Canceled'
+// CourierStatus: 'Available' | 'OnDuty' | 'OffDuty'
+// ExpenseStatus: 'Pending' | 'Approve' | 'Reject'
+// ReconciliationStatus: 'Cocok' | 'Selisih'
+// ApprovalStatus: 'Pending' | 'Disetujui' | 'Ditolak'
+// RestockStatus: 'Pending' | 'Approved' | 'Rejected'
+// LogisticsStatus: 'InTransit' | 'DriverEnRoute' | 'AwaitingVerification' | 'Completed' | 'CompletedDiscrepancy'
 
 // ============================================================
 // USER AUTHENTICATION & MANAGEMENT MODELS
@@ -80,7 +33,7 @@ model User {
   nama       String
   email      String   @unique
   password   String   // bcrypt hashed
-  role       UserRole
+  role       String   // 'Owner' | 'Admin' | 'Kurir'
   id_cabang  String?  // NULL for Owner (has access to all branches)
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
@@ -92,7 +45,6 @@ model User {
   @@index([email])
   @@index([id_cabang])
   @@index([role])
-  @@map("users")
 }
 
 // ============================================================
@@ -125,8 +77,6 @@ model Branch {
   logistics_logs        LogisticsLog[]
   customers             Customer[]
   users                 User[]
-
-  @@map("branches")
 }
 
 // ============================================================
@@ -147,7 +97,6 @@ model CashBookEntry {
 
   @@index([id_cabang])
   @@index([tipe])
-  @@map("cash_book_entries")
 }
 
 // ============================================================
@@ -168,7 +117,6 @@ model Courier {
 
   @@index([id_cabang])
   @@index([is_available])
-  @@map("couriers")
 }
 
 // ============================================================
@@ -203,6 +151,7 @@ model Order {
   source                 String?   // 'whatsapp' or 'outlet'
   assigned_by            String?
   assigned_at            DateTime?
+  metode_pembayaran     String?   @default("Tunai")
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
@@ -214,7 +163,7 @@ model Order {
   @@index([status])
   @@index([source])
   @@index([tanggal_order])
-  @@map("orders")
+  @@index([metode_pembayaran])
 }
 
 // ============================================================
@@ -241,7 +190,6 @@ model Expense {
   @@index([id_cabang])
   @@index([status])
   @@index([kategori])
-  @@map("expenses")
 }
 
 // ============================================================
@@ -260,7 +208,6 @@ model MonthlyBudget {
 
   @@unique([id_cabang, bulan, tahun])
   @@index([id_cabang])
-  @@map("monthly_budgets")
 }
 
 // ============================================================
@@ -280,7 +227,6 @@ model InventoryItem {
 
   @@unique([id_cabang, item])
   @@index([id_cabang])
-  @@map("inventory_items")
 }
 
 // ============================================================
@@ -305,7 +251,6 @@ model ReconciliationLog {
   @@index([id_cabang])
   @@index([status])
   @@index([approval_status])
-  @@map("reconciliation_logs")
 }
 
 // ============================================================
@@ -328,7 +273,6 @@ model RestockRequest {
 
   @@index([id_cabang])
   @@index([status])
-  @@map("restock_requests")
 }
 
 // ============================================================
@@ -348,7 +292,6 @@ model LogisticsLog {
 
   @@index([id_cabang])
   @@index([status])
-  @@map("logistics_logs")
 }
 
 // ============================================================
@@ -363,8 +306,6 @@ model ServiceTariff {
   harga_per_satuan Float
   estimasi_hari    Int
   is_active        Boolean @default(true)
-
-  @@map("service_tariffs")
 }
 
 // ============================================================
@@ -374,8 +315,6 @@ model ServiceTariff {
 model ExpenseCategory {
   id   String @id @default(cuid())
   name String @unique
-
-  @@map("expense_categories")
 }
 
 // ============================================================
@@ -390,7 +329,6 @@ model CourierTaskSequence {
 
   @@unique([id_kurir, id_order])
   @@index([id_kurir])
-  @@map("courier_task_sequences")
 }
 
 // ============================================================
@@ -408,7 +346,6 @@ model InventoryAnomaly {
   timestamp     DateTime @default(now())
 
   @@index([id_cabang])
-  @@map("inventory_anomalies")
 }
 
 // ============================================================
@@ -428,5 +365,4 @@ model Customer {
   branch  Branch   @relation(fields: [id_cabang], references: [id_cabang])
 
   @@index([id_cabang])
-  @@map("customers")
 }

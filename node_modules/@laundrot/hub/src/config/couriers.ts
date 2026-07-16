@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import type { Courier as PrismaCourier } from '../generated/prisma/client.js';
+import type { Courier as PrismaCourier } from '@prisma/client';
 import type { Courier } from '@laundrot/shared-types';
 
 // ==========================================

@@ -5,7 +5,7 @@
 // ==========================================
 
 import { prisma } from '../lib/prisma.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '@prisma/client';
 
 // Type definitions matching Prisma schema
 export interface WhatsAppOrder {
@@ -52,11 +52,11 @@ export type UnifiedOrder = WhatsAppOrder | OutletOrder;
 export type CreateWhatsAppOrder = Omit<Prisma.OrderCreateInput, 'branch' | 'courier'>;
 export type CreateOutletOrder = Omit<Prisma.OrderCreateInput, 'branch' | 'courier'>;
 
-let orderCounter = 1;
-
+// Generate unique order ID using timestamp + random suffix
 function generateOrderId(prefix: string = 'ORD'): string {
-  const id = `${prefix}-${String(orderCounter++).padStart(6, '0')}`;
-  return id;
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}-${timestamp}-${random}`;
 }
 
 // ==========================================
@@ -195,6 +195,7 @@ export async function createOutletOrder(data: {
   berat_kg: number;
   total_harga: number;
   status: string;
+  metode_pembayaran?: string; // FIX: Tambahkan field metode_pembayaran
 }): Promise<OutletOrder> {
   const id_order = generateOrderId('ORD-O');
 
@@ -218,6 +219,7 @@ export async function createOutletOrder(data: {
       source: 'outlet',
       qty: data.qty,
       satuan: data.satuan,
+      metode_pembayaran: data.metode_pembayaran || 'Tunai', // FIX: Simpan metode_pembayaran
     },
   });
 

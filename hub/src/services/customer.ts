@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import type { Customer as PrismaCustomer } from '../generated/prisma/client.js';
+import type { Customer as PrismaCustomer } from '@prisma/client';
 import { getBranchById } from '../config/branches.js';
 
 export interface CreateCustomerInput {

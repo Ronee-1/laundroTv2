@@ -155,33 +155,66 @@ export function DashboardKurir({ triggerNotification }: Props) {
     if (online && logisticsQueue.some((a) => !a.synced)) handleSyncLogistics();
   }, [online, logisticsQueue, handleSyncLogistics]);
 
-  async function fetchCustomerTasks() {
-    // Use courier_id from auth context, fallback to KUR-001 for testing
-    const courierId = user?.courier_id || 'KUR-001';
+  // BUG FIX: useCallback to properly track user dependency
+  const fetchCustomerTasks = useCallback(async () => {
+    // Get courier_id from user object, if not available skip fetch
+    const courierId = user?.courier_id;
+    if (!courierId) {
+      console.log('[DashboardKurir] courier_id not available yet, skipping fetch');
+      return;
+    }
+    console.log(`[DashboardKurir] Fetching tasks for courier: ${courierId}`);
     try {
       const res = await fetch(`/api/couriers/${courierId}/tasks`);
       const json = await res.json();
-      if (res.ok && json.success) setCustomerTasks(json.tugas);
-    } catch { /* ignore */ }
-  }
+      console.log(`[DashboardKurir] API response:`, json);
+      if (res.ok && json.success) {
+        setCustomerTasks(json.tugas || []);
+      } else {
+        console.error('[DashboardKurir] API error:', json.error);
+      }
+    } catch (err) {
+      console.error('[DashboardKurir] Fetch error:', err);
+    }
+  }, [user?.courier_id]); // ← Dependency pada courier_id
 
-  async function fetchLogistics() {
+  // BUG FIX: Wrap in useCallback to prevent infinite loop
+  // fetchLogistics doesn't depend on any props/state, so deps array is empty
+  const fetchLogistics = useCallback(async () => {
     try {
       const res = await fetch('/api/logistics/active');
       const json = await res.json();
       if (res.ok && json.success) setLogisticsTasks(json.logs);
-    } catch { /* ignore */ }
-  }
+    } catch (err) {
+      console.error('[DashboardKurir] fetchLogistics error:', err);
+    }
+  }, []); // ← Empty deps - function is stable
 
+  // BUG FIX: Initial load effect - runs once on mount
+  // DO NOT add state setters (setLoading, setCustomerTasks, etc.) to deps
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // Only set loading=false AFTER all fetches complete
       await Promise.all([fetchCustomerTasks(), fetchLogistics()]);
       if (!cancelled) setLoading(false);
     }
     load();
+    // Cleanup function prevents state update if component unmounts
     return () => { cancelled = true; };
-  }, []);
+  }, []); // ← Empty deps - runs ONCE on mount only!
+
+  // BUG FIX: Auto-refresh using setInterval (separate from initial load)
+  // This runs every 30 seconds to refresh data without affecting loading state
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      console.log('[DashboardKurir] Auto-refreshing data...');
+      fetchCustomerTasks();
+      fetchLogistics();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [fetchCustomerTasks, fetchLogistics]); // Safe - only refreshes data
 
   function handleCustomerStatusChange(id_order: string, new_status: string) {
     if (!isOnline()) {

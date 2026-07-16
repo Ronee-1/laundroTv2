@@ -1,4 +1,4 @@
-import { PrismaClient } from '../src/generated/prisma/client.js';
+import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
@@ -224,10 +224,13 @@ async function main() {
   console.log(`   ✓ Seeded ${couriers.length} couriers\n`);
 
   // ============================================================
-  // SEED ORDERS
+  // SEED ORDERS (Including Non-Tunai for revenue breakdown)
   // ============================================================
 
   console.log('📦 Seeding Orders...');
+
+  // Today's date for recent orders
+  const todayOrder = new Date();
 
   const orders = await Promise.all([
     prisma.order.upsert({
@@ -239,7 +242,8 @@ async function main() {
         alamat_pengantaran: 'Jl. Kemang Selatan No. 5, Jakarta Selatan',
         latitude_penjemputan: -6.2650, longitude_penjemputan: 106.8130,
         latitude_pengantaran: -6.2650, longitude_pengantaran: 106.8130,
-        status: 'Pending', berat_kg: 3.5, total_harga: 70000,
+        status: 'Pending', berat_kg: 3.5, total_harga: 70000, metode_pembayaran: 'Tunai',
+        customer_name: 'Budi Santoso', source: 'outlet',
       },
     }),
     prisma.order.upsert({
@@ -251,7 +255,8 @@ async function main() {
         alamat_pengantaran: 'Jl. Bangka Raya No. 12, Jakarta Selatan',
         latitude_penjemputan: -6.2710, longitude_penjemputan: 106.8200,
         latitude_pengantaran: -6.2710, longitude_pengantaran: 106.8200,
-        status: 'On Route', berat_kg: 2.0, total_harga: 40000,
+        status: 'On Route', berat_kg: 2.0, total_harga: 40000, metode_pembayaran: 'Non-Tunai',
+        customer_name: 'Ani Wijaya', source: 'outlet',
       },
     }),
     prisma.order.upsert({
@@ -263,7 +268,8 @@ async function main() {
         alamat_pengantaran: 'Jl. Puri Indah Blok A No. 8, Jakarta Barat',
         latitude_penjemputan: -6.1850, longitude_penjemputan: 106.7400,
         latitude_pengantaran: -6.1850, longitude_pengantaran: 106.7400,
-        status: 'Pending', berat_kg: 5.0, total_harga: 100000,
+        status: 'Pending', berat_kg: 5.0, total_harga: 100000, metode_pembayaran: 'Tunai',
+        customer_name: 'Dedi Kurniawan', source: 'outlet',
       },
     }),
     prisma.order.upsert({
@@ -275,7 +281,47 @@ async function main() {
         alamat_pengantaran: 'Jl. Pemuda No. 30, Jakarta Timur',
         latitude_penjemputan: -6.1920, longitude_penjemputan: 106.8900,
         latitude_pengantaran: -6.1920, longitude_pengantaran: 106.8900,
-        status: 'Pending', berat_kg: 4.0, total_harga: 80000,
+        status: 'Pending', berat_kg: 4.0, total_harga: 80000, metode_pembayaran: 'Non-Tunai',
+        customer_name: 'Ahmad Fauzi', source: 'outlet',
+      },
+    }),
+    // Add some recent orders for today
+    prisma.order.create({
+      data: {
+        id_order: `ORD-NEW-${Date.now().toString(36).toUpperCase()}`,
+        id_cabang: 'CBG-002',
+        id_pelanggan: 'PLG-SEED-001',
+        alamat_penjemputan: 'Jl. Kemang Raya No. 15, Jakarta Selatan',
+        alamat_pengantaran: 'Jl. Kemang Raya No. 15, Jakarta Selatan',
+        latitude_penjemputan: -6.2615, longitude_penjemputan: 106.8106,
+        latitude_pengantaran: -6.2615, longitude_pengantaran: 106.8106,
+        status: 'Pending',
+        berat_kg: 3.0,
+        total_harga: 24000,
+        metode_pembayaran: 'Tunai',
+        customer_name: 'Pelanggan Outlet CBG-002',
+        customer_whatsapp: '081234567899',
+        source: 'outlet',
+        created_at: todayOrder,
+      },
+    }),
+    prisma.order.create({
+      data: {
+        id_order: `ORD-NEW-${(Date.now() + 1).toString(36).toUpperCase()}`,
+        id_cabang: 'CBG-005',
+        id_pelanggan: 'PLG-SEED-002',
+        alamat_penjemputan: 'Jl. Pajajaran No. 30, Bogor',
+        alamat_pengantaran: 'Jl. Pajajaran No. 30, Bogor',
+        latitude_penjemputan: -6.5971, longitude_penjemputan: 106.8060,
+        latitude_pengantaran: -6.5971, longitude_pengantaran: 106.8060,
+        status: 'Pending',
+        berat_kg: 5.0,
+        total_harga: 40000,
+        metode_pembayaran: 'Tunai',
+        customer_name: 'Pelanggan Outlet CBG-005',
+        customer_whatsapp: '081234567898',
+        source: 'outlet',
+        created_at: todayOrder,
       },
     }),
   ]);
@@ -452,6 +498,92 @@ async function main() {
   console.log(`   ✓ Seeded ${tariffs.length} service tariffs\n`);
 
   // ============================================================
+  // SEED CASHBOOK ENTRIES (Revenue tracking)
+  // ============================================================
+
+  console.log('💵 Seeding Cashbook Entries (Revenue)...');
+
+  // Get today's date for recent entries
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const cashbookEntries = await Promise.all([
+    // CBG-001 - Today's Tunai revenue
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-001`,
+        id_cabang: 'CBG-001',
+        id_transaksi: 'ORD-SEED-001',
+        nominal: 85000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Budi Santoso - Cuci Kering Setrika Reguler - Tunai',
+        tanggal_jurnal: today,
+      },
+    }),
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-002`,
+        id_cabang: 'CBG-001',
+        id_transaksi: 'ORD-SEED-002',
+        nominal: 120000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Ani Wijaya - Bedcover Reguler - Tunai',
+        tanggal_jurnal: today,
+      },
+    }),
+    // CBG-002 - Today's Tunai revenue
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-003`,
+        id_cabang: 'CBG-002',
+        id_transaksi: 'ORD-SEED-003',
+        nominal: 240000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Dedi Kurniawan - Cuci Kering Setrika Ekspres - Tunai',
+        tanggal_jurnal: today,
+      },
+    }),
+    // CBG-003 - Today's Tunai revenue
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-004`,
+        id_cabang: 'CBG-003',
+        id_transaksi: 'ORD-SEED-004',
+        nominal: 160000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Ahmad Fauzi - Cuci Kering Setrika Reguler - Tunai',
+        tanggal_jurnal: today,
+      },
+    }),
+    // CBG-004 - Yesterday's Tunai revenue
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-005`,
+        id_cabang: 'CBG-004',
+        id_transaksi: 'ORD-SEED-005',
+        nominal: 200000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Pelanggan CBG-004 - Cuci Kering Setrika Reguler - Tunai',
+        tanggal_jurnal: yesterday,
+      },
+    }),
+    // CBG-005 - Today's Tunai revenue (this branch works correctly per user)
+    prisma.cashBookEntry.create({
+      data: {
+        id_jurnal: `JRN-${Date.now().toString(36).toUpperCase()}-006`,
+        id_cabang: 'CBG-005',
+        id_transaksi: 'ORD-SEED-006',
+        nominal: 320000,
+        tipe: 'Pemasukan',
+        deskripsi: 'Pendapatan laundry - Pelanggan CBG-005 - Cuci Kering Setrika Reguler - Tunai',
+        tanggal_jurnal: today,
+      },
+    }),
+  ]);
+  console.log(`   ✓ Seeded ${cashbookEntries.length} cashbook entries for revenue tracking\n`);
+
+  // ============================================================
   // SEED EXPENSE CATEGORIES
   // ============================================================
 
@@ -531,6 +663,11 @@ async function main() {
   console.log('   CBG-003: Bekasi Timur');
   console.log('   CBG-004: Tangerang Kota');
   console.log('   CBG-005: Bogor Raya');
+  console.log('');
+  console.log('💵 Revenue Data Seeded:');
+  console.log('   - Cashbook entries for Tunai payments');
+  console.log('   - Orders with both Tunai and Non-Tunai payments');
+  console.log('   - Dashboard will show real-time revenue per branch');
   console.log('');
   console.log('👥 5 Sample Customers seeded (can be selected in Outlet Reception)');
   console.log('   CBG-001: Budi Santoso, Ani Wijaya');

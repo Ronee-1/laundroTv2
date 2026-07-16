@@ -46,9 +46,39 @@ export async function GET(request: Request) {
       return errorResponse('User not found', 404);
     }
 
+    // Find courier_id for Kurir users
+    let courier_id: string | null = null;
+    if (user.role === 'Kurir' && user.id_cabang) {
+      // Strategy 1: Direct match
+      let courier = await prisma.courier.findFirst({
+        where: {
+          id_cabang: user.id_cabang,
+          id_kurir: user.id_user,
+        },
+        select: { id_kurir: true },
+      });
+
+      // Strategy 2: Match by name
+      if (!courier) {
+        courier = await prisma.courier.findFirst({
+          where: {
+            id_cabang: user.id_cabang,
+            nama_kurir: user.nama,
+          },
+          select: { id_kurir: true },
+        });
+      }
+
+      courier_id = courier?.id_kurir ?? null;
+      console.log(`[Auth/me] courier_id for ${user.nama}: ${courier_id}`);
+    }
+
     return jsonResponse({
       success: true,
-      data: { user },
+      user: {
+        ...user,
+        courier_id,
+      },
     });
   } catch (error) {
     console.error('[Auth] Get profile error:', error);

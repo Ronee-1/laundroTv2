@@ -9,6 +9,27 @@ import { requireAuth } from '../utils/auth';
 import { getCorsHeaders } from '../utils/cors';
 import { jsonResponse, errorResponse } from '../utils/response';
 
+/**
+ * Create cashbook entry for Tunai payments
+ */
+async function createCashbookEntryForOrder(order: any) {
+  // Only create cashbook entry for Tunai payments
+  if (order.metode_pembayaran === 'Tunai' && order.total_harga > 0) {
+    const id_jurnal = `JRN-${Date.now().toString(36).toUpperCase()}`;
+    await prisma.cashBookEntry.create({
+      data: {
+        id_jurnal,
+        id_cabang: order.id_cabang,
+        id_transaksi: order.id_order,
+        nominal: order.total_harga,
+        tipe: 'Pemasukan',
+        deskripsi: `Pendapatan laundry - ${order.customer_name || 'Pelanggan'} - ${order.service_name || 'Layanan'} - Tunai`,
+        tanggal_jurnal: new Date(),
+      },
+    });
+  }
+}
+
 export async function GET(request: Request) {
   try {
     if (request.method === 'OPTIONS') {
@@ -109,7 +130,7 @@ export async function POST(request: Request) {
     }
 
     // Generate order ID
-    const id_order = `ORD-${Date.now().toString(36).toUpperCase()}`;
+    const id_order = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const order = await prisma.order.create({
       data: {
@@ -138,6 +159,9 @@ export async function POST(request: Request) {
         metode_pembayaran: body.metode_pembayaran || 'Tunai',
       },
     });
+
+    // Auto-create cashbook entry for Tunai payments
+    await createCashbookEntryForOrder(order);
 
     return jsonResponse({
       success: true,

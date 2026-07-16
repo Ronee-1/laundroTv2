@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { getBranchById, getAllBranches } from '../config/branches.js';
+import { prisma } from '../lib/prisma.js';
 import {
   createReconciliation,
   getReconciliationByBranch,
@@ -9,7 +10,6 @@ import {
   rejectReconciliation,
   overrideReconciliation,
 } from '../services/reconciliation.js';
-import { getTotalApprovedExpenses } from '../services/expense.js';
 import { restockInventory, getInventoryByBranch, adjustInventory } from '../services/inventory.js';
 import { createOutletOrder, getOrdersByBranch } from '../services/unifiedOrders.js';
 import {
@@ -70,8 +70,23 @@ router.post(
         return;
       }
 
-      const totalExpenses = await getTotalApprovedExpenses(id_cabang);
-      const kas_digital = branch.omzet - totalExpenses;
+      // Calculate kas_digital from CashBookEntry (synchronized with API routes)
+      // Sum of today's cashbook entries: Pemasukan (+), Pengeluaran (-)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const todayCashbookEntries = await prisma.cashBookEntry.findMany({
+        where: {
+          id_cabang,
+          tanggal_jurnal: {
+            gte: startOfDay,
+          },
+        },
+      });
+
+      const kas_digital = todayCashbookEntries.reduce((sum, entry) => {
+        return entry.tipe === 'Pemasukan' ? sum + entry.nominal : sum - entry.nominal;
+      }, 0);
 
       const log = await createReconciliation({
         id_cabang,
@@ -532,14 +547,50 @@ router.post(
 // FR-012: Daily Financial Summary for Admin Audit
 // Returns today's income, expenses, and remaining cash
 // ==========================================
-type DailySummaryResponse = | { success: true; id_cabang: string; total_pemasukan: number; total_pengeluaran: number; sisa_kas: number; transaction_count: number }
-  | { success: false; error: string };
+// Daily summary response interface
+interface DailySummarySuccessResponse {
+  success: true;
+  id_cabang: string;
+  today_revenue: number;
+  month_revenue: number;
+  today_orders: number;
+  month_orders: number;
+  today_cash: number;
+  today_non_cash: number;
+  month_cash: number;
+  month_non_cash: number;
+  cashbook_balance: number;
+  data: {
+    orders: {
+      total: number;
+      pending: number;
+      completed: number;
+    };
+    expenses: {
+      total: number;
+      count: number;
+    };
+    cashbook: {
+      total_pemasukan: number;
+      total_pengeluaran: number;
+      saldo: number;
+    };
+  };
+}
+
+interface DailySummaryErrorResponse {
+  success: false;
+  error: string;
+}
+
+type DailySummaryResponse = DailySummarySuccessResponse | DailySummaryErrorResponse;
 
 router.get(
   '/:id_cabang/daily-summary',
   async (req: Request<{ id_cabang: string }, DailySummaryResponse>, res: Response<DailySummaryResponse>) => {
     try {
       const { id_cabang } = req.params;
+      const { prisma } = await import('../lib/prisma.js');
 
       const branch = await getBranchById(id_cabang);
       if (!branch) {
@@ -547,18 +598,105 @@ router.get(
         return;
       }
 
-      // Calculate from approved expenses
-      const total_pengeluaran = await getTotalApprovedExpenses(id_cabang);
-      const total_pemasukan = branch.omzet * 0.7; // Mock: 70% of omzet as today's income
-      const sisa_kas = total_pemasukan - total_pengeluaran;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      // Get today's cashbook entries
+      const todayCashbook = await prisma.cashBookEntry.findMany({
+        where: {
+          id_cabang,
+          tanggal_jurnal: { gte: today },
+        },
+      });
+
+      // Get month's cashbook entries
+      const monthCashbook = await prisma.cashBookEntry.findMany({
+        where: {
+          id_cabang,
+          tanggal_jurnal: { gte: startOfMonth },
+        },
+      });
+
+      // Calculate Tunai revenue from cashbook (Pemasukan)
+      const todayCash = todayCashbook
+        .filter((e) => e.tipe === 'Pemasukan')
+        .reduce((sum, e) => sum + Number(e.nominal), 0);
+
+      const monthCash = monthCashbook
+        .filter((e) => e.tipe === 'Pemasukan')
+        .reduce((sum, e) => sum + Number(e.nominal), 0);
+
+      // Get today's and month's orders for counts and non-cash revenue
+      const allTodayOrders = await prisma.order.findMany({
+        where: {
+          id_cabang,
+          created_at: { gte: today },
+        },
+      });
+
+      const allMonthOrders = await prisma.order.findMany({
+        where: {
+          id_cabang,
+          created_at: { gte: startOfMonth },
+        },
+      });
+
+      // Calculate Non-Tunai revenue from orders
+      const todayNonCash = allTodayOrders
+        .filter((o) => o.metode_pembayaran === 'Non-Tunai')
+        .reduce((sum, o) => sum + Number(o.total_harga || 0), 0);
+
+      const monthNonCash = allMonthOrders
+        .filter((o) => o.metode_pembayaran === 'Non-Tunai')
+        .reduce((sum, o) => sum + Number(o.total_harga || 0), 0);
+
+      // Total revenue = Tunai (cashbook) + Non-Tunai (orders)
+      const todayRevenue = todayCash + todayNonCash;
+      const monthRevenue = monthCash + monthNonCash;
+
+      // Get expenses
+      const todayExpenses = await prisma.expense.findMany({
+        where: {
+          id_cabang,
+          tanggal: { gte: today },
+          status: 'Approve',
+        },
+      });
+
+      const totalPengeluaran = todayCashbook
+        .filter((e) => e.tipe === 'Pengeluaran')
+        .reduce((sum, e) => sum + Number(e.nominal), 0);
 
       res.status(200).json({
         success: true,
         id_cabang,
-        total_pemasukan,
-        total_pengeluaran,
-        sisa_kas,
-        transaction_count: Math.floor(Math.random() * 20) + 5, // Mock transaction count
+        today_revenue: todayRevenue,
+        month_revenue: monthRevenue,
+        today_orders: allTodayOrders.length,
+        month_orders: allMonthOrders.length,
+        today_cash: todayCash,
+        today_non_cash: todayNonCash,
+        month_cash: monthCash,
+        month_non_cash: monthNonCash,
+        cashbook_balance: todayCash - totalPengeluaran,
+        data: {
+          orders: {
+            total: allTodayOrders.length,
+            pending: allTodayOrders.filter((o) => o.status === 'Pending').length,
+            completed: allTodayOrders.filter((o) => ['Done', 'Selesai', 'Lunas'].includes(o.status)).length,
+          },
+          expenses: {
+            total: todayExpenses.reduce((sum, e) => sum + Number(e.nominal), 0),
+            count: todayExpenses.length,
+          },
+          cashbook: {
+            total_pemasukan: todayCash,
+            total_pengeluaran: totalPengeluaran,
+            saldo: todayCash - totalPengeluaran,
+          },
+        },
       });
     } catch (error) {
       console.error('[Branches] GET /:id_cabang/daily-summary error:', error);
@@ -723,13 +861,14 @@ interface CreateOutletOrderBody {
   total_harga: number;
   satuan?: string;
   status?: string;
+  metode_pembayaran?: string; // FIX: Tambahkan field metode_pembayaran
 }
 
 router.post(
   '/:id_cabang/orders',
   async (req: Request<{ id_cabang: string }, any, CreateOutletOrderBody>, res: Response) => {
     const { id_cabang } = req.params;
-    const { id_pelanggan, customer_name, customer_whatsapp, id_layanan, service_name, qty, berat_kg, total_harga, satuan, status } = req.body;
+    const { id_pelanggan, customer_name, customer_whatsapp, id_layanan, service_name, qty, berat_kg, total_harga, satuan, status, metode_pembayaran } = req.body;
 
     // Validate required fields
     if (!customer_name || !id_layanan || typeof qty !== 'number' || qty <= 0 || typeof total_harga !== 'number') {
@@ -762,6 +901,7 @@ router.post(
         berat_kg: berat_kg || qty,
         total_harga,
         status: status || 'Baru',
+        metode_pembayaran: metode_pembayaran || 'Tunai', // FIX: Teruskan metode_pembayaran
       });
 
       console.log(`[OUTLET ORDER] Created: ${order.id_order} at ${id_cabang} - ${customer_name} - ${service_name}`);

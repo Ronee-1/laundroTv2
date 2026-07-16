@@ -53,13 +53,33 @@ export async function POST(request: Request): Promise<Response> {
       branchInfo = branch;
     }
 
+    // Find courier that matches the user's id_user
     let courierId: string | null = null;
     if (user.role === 'Kurir' && user.id_cabang) {
-      const courier = await prisma.courier.findFirst({
-        where: { id_cabang: user.id_cabang },
+      // Strategy 1: Direct match (for seeded data where user.id_user = courier.id_kurir)
+      let courier = await prisma.courier.findFirst({
+        where: {
+          id_cabang: user.id_cabang,
+          id_kurir: user.id_user,
+        },
         select: { id_kurir: true },
       });
+
+      // Strategy 2: If not found, match by name in the same branch
+      // (For registered kurirs where id_kurir = "KUR-USR-XXXX" but user.id_user = "KUR-XXXX")
+      if (!courier) {
+        courier = await prisma.courier.findFirst({
+          where: {
+            id_cabang: user.id_cabang,
+            nama_kurir: user.nama, // Match by name
+          },
+          select: { id_kurir: true },
+        });
+        console.log(`[Login] Courier match by name: ${courier?.id_kurir ?? 'not found'}`);
+      }
+
       courierId = courier?.id_kurir ?? null;
+      console.log(`[Login] Final courierId for ${user.nama}: ${courierId}`);
     }
 
     const token = generateToken({
